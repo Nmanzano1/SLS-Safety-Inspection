@@ -442,7 +442,15 @@ function cleanStatus(raw) {
 
 function cleanText(str) {
   if (!str) return "";
-  return String(str).replace(/[^ -~]/g, "").trim();
+  // Force ASCII only - replace any non-ASCII with empty string
+  const s = String(str);
+  let result = "";
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    if (code >= 32 && code <= 126) result += s[i];
+    else if (code === 10 || code === 13) result += " ";
+  }
+  return result.replace(/\s+/g, " ").trim();
 }
 function generateInspectionPDF(inspection, deficiencies) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -511,7 +519,11 @@ function generateInspectionPDF(inspection, deficiencies) {
       const rawStatus = inspection.itemStatus?.[key] || "";
       const status = cleanStatus(rawStatus);
       const remark = cleanText(inspection.itemRemarks?.[key] || "");
-      return [cleanText(item), status, remark];
+      // Clean the item text - remove special chars like >= symbols, section signs
+      const cleanItem = cleanText(item)
+        .replace(/>=/g, ">=")
+        .replace(/sec\./gi, "Sec.");
+      return [cleanItem, status, remark];
     });
 
     const hasContent = rows.some(r => r[1] !== "--");
