@@ -429,6 +429,21 @@ export default function App() {
 }
 
 // ─── PDF GENERATOR ─────────────────────────────────────────────────────────────
+function cleanStatus(raw) {
+  if (!raw) return "--";
+  const s = String(raw);
+  if (s.includes("Satisfactory") || s.includes("Satisf")) return "PASS";
+  if (s.includes("Deficiency") || s.includes("Defic")) return "DEFICIENCY";
+  if (s.includes("N/A")) return "N/A";
+  if (s.includes("PASS")) return "PASS";
+  if (s.includes("DEFICIENCY")) return "DEFICIENCY";
+  return "--";
+}
+
+function cleanText(str) {
+  if (!str) return "";
+  return String(str).replace(/[^ -~]/g, "").trim();
+}
 function generateInspectionPDF(inspection, deficiencies) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -493,10 +508,10 @@ function generateInspectionPDF(inspection, deficiencies) {
   INSPECTION_SECTIONS.forEach((sec) => {
     const rows = sec.items.map((item, i) => {
       const key = `${sec.id}_${i}`;
-      const rawStatus = inspection.itemStatus?.[key] || "--";
-      const status = rawStatus === "✓ Satisfactory" ? "PASS" : rawStatus === "✗ Deficiency" ? "DEFICIENCY" : rawStatus === "N/A" ? "N/A" : "--";
-      const remark = inspection.itemRemarks?.[key] || "";
-      return [item, status, remark];
+      const rawStatus = inspection.itemStatus?.[key] || "";
+      const status = cleanStatus(rawStatus);
+      const remark = cleanText(inspection.itemRemarks?.[key] || "");
+      return [cleanText(item), status, remark];
     });
 
     const hasContent = rows.some(r => r[1] !== "--");
