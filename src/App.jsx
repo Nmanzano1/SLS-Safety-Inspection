@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 // ─── FIREBASE CONFIG ───────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -235,7 +237,7 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [inspections, setInspections] = useState([]);
   const [deficiencies, setDeficiencies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
 
   const handleLogin = () => {
@@ -341,14 +343,6 @@ export default function App() {
     setDeficiencies(updated);
   }, [deficiencies]);
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f1923", color: "#B8972A", fontFamily: "monospace", fontSize: 18 }}>
-        Loading SLS Safety System...
-      </div>
-    );
-  }
-
   if (!authenticated) {
     return (
       <div style={{ minHeight: "100vh", background: "#0f1923", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', sans-serif", padding: 24 }}>
@@ -432,6 +426,187 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+// ─── PDF GENERATOR ─────────────────────────────────────────────────────────────
+function generateInspectionPDF(inspection, deficiencies) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const gold = [184, 151, 42];
+  const navy = [15, 25, 35];
+  const dark = [30, 40, 55];
+
+  // Header background
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, pageW, 28, "F");
+  doc.setFillColor(...gold);
+  doc.rect(0, 28, pageW, 1, "F");
+
+  // Logo text
+  doc.setTextColor(...gold);
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.text("SLS", margin, 18);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(200, 200, 200);
+  doc.text("SAFETY INSPECTION SYSTEM", margin + 14, 13);
+  doc.text("RGV Barriers & Attributes  |  Contract #70B01C23F00001236", margin + 14, 19);
+
+  // Report title
+  doc.setTextColor(...gold);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text(inspection.inspectionType || "Daily Safety Inspection", pageW - margin, 18, { align: "right" });
+
+  // Project Info Table
+  let y = 35;
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(50, 50, 50);
+
+  const infoData = [
+    ["Date", inspection.date || "—", "Inspector", inspection.inspector || "—"],
+    ["Project Area", inspection.projectArea || "—", "Weather", inspection.weather || "—"],
+    ["Subcontractors", Array.isArray(inspection.subcontractors) ? inspection.subcontractors.join(", ") : (inspection.subcontractors || "—"), "Temp High / Low", `${inspection.tempHigh || "—"}°F / ${inspection.tempLow || "—"}°F`],
+    ["AHA Sign-In Verified", inspection.ahaSignedIn ? "✓ Yes" : "✗ No", "Toolbox Talk", inspection.toolboxTopic || "None"],
+  ];
+
+  doc.autoTable({
+    startY: y,
+    body: infoData,
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 30, 30] },
+    columnStyles: {
+      0: { fontStyle: "bold", fillColor: [240, 240, 240], cellWidth: 35 },
+      1: { cellWidth: 55 },
+      2: { fontStyle: "bold", fillColor: [240, 240, 240], cellWidth: 35 },
+      3: { cellWidth: 55 },
+    },
+    margin: { left: margin, right: margin },
+  });
+
+  y = doc.lastAutoTable.finalY + 6;
+
+  // Inspection Sections
+  INSPECTION_SECTIONS.forEach((sec) => {
+    const rows = sec.items.map((item, i) => {
+      const key = `${sec.id}_${i}`;
+      const status = inspection.itemStatus?.[key] || "—";
+      const remark = inspection.itemRemarks?.[key] || "";
+      return [item, status, remark];
+    });
+
+    const hasContent = rows.some(r => r[1] !== "—");
+    if (!hasContent) return;
+
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: sec.label, colSpan: 3, styles: { fillColor: navy, textColor: gold, fontStyle: "bold", fontSize: 9 } }],
+             ["Inspection Item", "Status", "Remarks"]],
+      body: rows,
+      theme: "grid",
+      headStyles: { fillColor: dark, textColor: [200, 200, 200], fontSize: 7.5 },
+      styles: { fontSize: 7.5, cellPadding: 2, overflow: "linebreak" },
+      columnStyles: {
+        0: { cellWidth: 110 },
+        1: { cellWidth: 28, halign: "center", fontStyle: "bold" },
+        2: { cellWidth: 42 },
+      },
+      didParseCell: (data) => {
+        if (data.column.index === 1 && data.cell.raw === "✗ Deficiency") {
+          data.cell.styles.textColor = [220, 50, 50];
+        }
+        if (data.column.index === 1 && data.cell.raw === "✓ Satisfactory") {
+          data.cell.styles.textColor = [40, 160, 40];
+        }
+      },
+      margin: { left: margin, right: margin },
+    });
+
+    y = doc.lastAutoTable.finalY + 4;
+  });
+
+  // Deficiencies section
+  const inspDefs = deficiencies.filter(d => d.inspectionId === inspection.id);
+  if (inspDefs.length > 0) {
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: "DEFICIENCIES & CORRECTIVE ACTIONS", colSpan: 5, styles: { fillColor: [150, 30, 30], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 } }],
+             ["#", "Section", "Deficiency", "Corrective Action", "Status"]],
+      body: inspDefs.map((d, i) => [
+        i + 1,
+        d.section,
+        d.item,
+        d.correctiveAction || "Pending",
+        d.status,
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [80, 20, 20], textColor: [220, 180, 180], fontSize: 7.5 },
+      styles: { fontSize: 7.5, cellPadding: 2, overflow: "linebreak" },
+      columnStyles: {
+        0: { cellWidth: 8, halign: "center" },
+        1: { cellWidth: 32 },
+        2: { cellWidth: 68 },
+        3: { cellWidth: 52 },
+        4: { cellWidth: 20, halign: "center" },
+      },
+      margin: { left: margin, right: margin },
+    });
+    y = doc.lastAutoTable.finalY + 4;
+  }
+
+  // Notes
+  if (inspection.generalObservations || inspection.nearMisses || inspection.additionalNotes) {
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: "ADDITIONAL NOTES & OBSERVATIONS", colSpan: 2, styles: { fillColor: dark, textColor: gold, fontStyle: "bold", fontSize: 9 } }]],
+      body: [
+        inspection.generalObservations ? ["General Observations", inspection.generalObservations] : null,
+        inspection.nearMisses ? ["Near-Miss / Incident", inspection.nearMisses] : null,
+        inspection.additionalNotes ? ["Additional Notes", inspection.additionalNotes] : null,
+      ].filter(Boolean),
+      theme: "grid",
+      styles: { fontSize: 7.5, cellPadding: 2.5, overflow: "linebreak" },
+      columnStyles: { 0: { cellWidth: 40, fontStyle: "bold", fillColor: [240, 240, 240] }, 1: { cellWidth: 140 } },
+      margin: { left: margin, right: margin },
+    });
+    y = doc.lastAutoTable.finalY + 4;
+  }
+
+  // Signature block
+  const sigY = Math.max(y, doc.internal.pageSize.getHeight() - 35);
+  doc.setFillColor(...navy);
+  doc.rect(0, sigY, pageW, 35, "F");
+  doc.setFillColor(...gold);
+  doc.rect(0, sigY, pageW, 0.5, "F");
+
+  doc.setTextColor(...gold);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("CERTIFICATION", margin, sigY + 7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 180, 180);
+  doc.setFontSize(7);
+  doc.text("I certify that to the best of my knowledge, the information in this inspection is accurate and complete, and that all identified deficiencies", margin, sigY + 12);
+  doc.text("have been or are being corrected per OSHA 29 CFR 1926, EM 385-1-1, and project-specific Activity Hazard Analyses.", margin, sigY + 16);
+
+  doc.setDrawColor(...gold);
+  doc.line(margin, sigY + 26, margin + 80, sigY + 26);
+  doc.line(pageW - margin - 50, sigY + 26, pageW - margin, sigY + 26);
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(7);
+  doc.text("Signature / SSHO", margin, sigY + 30);
+  doc.text("Date", pageW - margin - 50, sigY + 30);
+
+  // Footer
+  doc.setTextColor(...gold);
+  doc.setFontSize(6.5);
+  doc.text(`SLS Safety  |  ${inspection.inspectionType || "Daily Safety Inspection"}  |  ${inspection.date || ""}  |  OSHA 29 CFR 1926 Compliant`, pageW / 2, sigY + 33, { align: "center" });
+
+  const filename = `SLS_Inspection_${(inspection.date || "").replace(/-/g, "")}_${(inspection.inspector || "").split(" ")[0]}.pdf`;
+  doc.save(filename);
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -619,7 +794,7 @@ function Dashboard({ inspections, deficiencies }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #1e3a5f" }}>
-                    {["Date", "Type", "Inspector", "Project Area", "Subcontractors", "Deficiencies", "Status"].map((h) => (
+                    {["Date", "Type", "Inspector", "Project Area", "Subcontractors", "Deficiencies", "Status", ""].map((h) => (
                       <th key={h} style={{ padding: "8px 12px", textAlign: "left", color: "#666", fontWeight: 600, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>{h}</th>
                     ))}
                   </tr>
@@ -649,6 +824,14 @@ function Dashboard({ inspections, deficiencies }) {
                         </td>
                         <td style={{ padding: "10px 12px" }}>
                           <span style={{ fontSize: 11, color: "#4caf50" }}>✓ Submitted</span>
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <button
+                            onClick={() => generateInspectionPDF(ins, deficiencies)}
+                            style={{ background: "#1a1500", border: "1px solid #D4AF37", borderRadius: 5, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#D4AF37", whiteSpace: "nowrap" }}
+                          >
+                            ⬇ PDF
+                          </button>
                         </td>
                       </tr>
                     );
