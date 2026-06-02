@@ -250,18 +250,30 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!authenticated) return;
-    async function init() {
-      const [insp, defs] = await Promise.all([
-        loadData(STORAGE_KEYS.INSPECTIONS),
-        loadData(STORAGE_KEYS.DEFICIENCIES),
-      ]);
-      setInspections(insp);
-      setDeficiencies(defs);
+    // Always stop loading after 3 seconds max
+    const timeout = setTimeout(() => setLoading(false), 3000);
+    if (!authenticated) {
+      clearTimeout(timeout);
       setLoading(false);
+      return;
+    }
+    async function init() {
+      try {
+        const [insp, defs] = await Promise.all([
+          loadData(STORAGE_KEYS.INSPECTIONS),
+          loadData(STORAGE_KEYS.DEFICIENCIES),
+        ]);
+        setInspections(insp);
+        setDeficiencies(defs);
+      } catch(e) {
+        console.error("Firebase load error:", e);
+      } finally {
+        clearTimeout(timeout);
+        setLoading(false);
+      }
     }
     init();
-  }, []);
+  }, [authenticated]);
 
   const submitInspection = useCallback(async (formData) => {
     const newInspection = {
