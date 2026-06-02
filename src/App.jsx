@@ -4,12 +4,12 @@ import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 // ─── FIREBASE CONFIG ───────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  apiKey: "AIzaSyB9TclNJFPnLIawkPNBLxUKbSZctRboleo",
+  authDomain: "sls-safety-inspection.firebaseapp.com",
+  projectId: "sls-safety-inspection",
+  storageBucket: "sls-safety-inspection.firebasestorage.app",
+  messagingSenderId: "429326685754",
+  appId: "1:429326685754:web:c54ef96173829612934703",
 };
 
 const app = initializeApp(firebaseConfig);
