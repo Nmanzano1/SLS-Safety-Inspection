@@ -227,13 +227,30 @@ function genId() {
 
 // ─── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(() => {
+    return localStorage.getItem("sls_auth") === "true";
+  });
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
   const [view, setView] = useState("dashboard");
   const [inspections, setInspections] = useState([]);
   const [deficiencies, setDeficiencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("");
 
+  const handleLogin = () => {
+    if (passwordInput === "Fishing") {
+      localStorage.setItem("sls_auth", "true");
+      setAuthenticated(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+      setPasswordInput("");
+    }
+  };
+
   useEffect(() => {
+    if (!authenticated) return;
     async function init() {
       const [insp, defs] = await Promise.all([
         loadData(STORAGE_KEYS.INSPECTIONS),
@@ -316,6 +333,38 @@ export default function App() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f1923", color: "#B8972A", fontFamily: "monospace", fontSize: 18 }}>
         Loading SLS Safety System...
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0f1923", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', sans-serif", padding: 24 }}>
+        <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: "3px solid #D4AF37", borderRadius: 12, padding: 40, width: "100%", maxWidth: 380, textAlign: "center" }}>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 900, fontSize: 28, color: "#D4AF37", letterSpacing: 2 }}>SLS</div>
+            <div style={{ fontSize: 13, color: "#888", marginTop: 4, letterSpacing: 1 }}>SAFETY INSPECTION SYSTEM</div>
+            <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>RGV Barriers & Attributes</div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="Enter password"
+              style={{ width: "100%", background: "#0a1018", border: `1px solid ${passwordError ? "#f44336" : "#1e3a5f"}`, borderRadius: 8, color: "#e8e8e8", padding: "14px 16px", fontSize: 15, boxSizing: "border-box", outline: "none", textAlign: "center", letterSpacing: 2 }}
+            />
+            {passwordError && <div style={{ color: "#f44336", fontSize: 12, marginTop: 8 }}>Incorrect password. Try again.</div>}
+          </div>
+          <button
+            onClick={handleLogin}
+            style={{ width: "100%", background: "linear-gradient(135deg,#B8972A,#D4AF37)", border: "none", borderRadius: 8, padding: "14px", fontWeight: 800, fontSize: 15, color: "#0a1018", cursor: "pointer", letterSpacing: 1 }}
+          >
+            ACCESS SYSTEM
+          </button>
+          <div style={{ marginTop: 20, fontSize: 11, color: "#444" }}>Contract #70B01C23F00001236</div>
+        </div>
       </div>
     );
   }
