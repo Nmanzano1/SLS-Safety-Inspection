@@ -467,10 +467,10 @@ function generateInspectionPDF(inspection, deficiencies) {
   doc.setTextColor(50, 50, 50);
 
   const infoData = [
-    ["Date", inspection.date || "—", "Inspector", inspection.inspector || "—"],
-    ["Project Area", inspection.projectArea || "—", "Weather", inspection.weather || "—"],
-    ["Subcontractors", Array.isArray(inspection.subcontractors) ? inspection.subcontractors.join(", ") : (inspection.subcontractors || "—"), "Temp High / Low", `${inspection.tempHigh || "—"}°F / ${inspection.tempLow || "—"}°F`],
-    ["AHA Sign-In Verified", inspection.ahaSignedIn ? "✓ Yes" : "✗ No", "Toolbox Talk", inspection.toolboxTopic || "None"],
+    ["Date", inspection.date || "--", "Inspector", inspection.inspector || "--"],
+    ["Project Area", inspection.projectArea || "--", "Weather", inspection.weather || "--"],
+    ["Subcontractors", Array.isArray(inspection.subcontractors) ? inspection.subcontractors.join(", ") : (inspection.subcontractors || "--"), "Temp High / Low", `${inspection.tempHigh || "--"}°F / ${inspection.tempLow || "--"}°F`],
+    ["AHA Sign-In Verified", inspection.ahaSignedIn ? "YES" : "NO", "Toolbox Talk", inspection.toolboxTopic || "None"],
   ];
 
   doc.autoTable({
@@ -493,12 +493,13 @@ function generateInspectionPDF(inspection, deficiencies) {
   INSPECTION_SECTIONS.forEach((sec) => {
     const rows = sec.items.map((item, i) => {
       const key = `${sec.id}_${i}`;
-      const status = inspection.itemStatus?.[key] || "—";
+      const rawStatus = inspection.itemStatus?.[key] || "--";
+      const status = rawStatus === "✓ Satisfactory" ? "PASS" : rawStatus === "✗ Deficiency" ? "DEFICIENCY" : rawStatus === "N/A" ? "N/A" : "--";
       const remark = inspection.itemRemarks?.[key] || "";
       return [item, status, remark];
     });
 
-    const hasContent = rows.some(r => r[1] !== "—");
+    const hasContent = rows.some(r => r[1] !== "--");
     if (!hasContent) return;
 
     doc.autoTable({
@@ -515,10 +516,11 @@ function generateInspectionPDF(inspection, deficiencies) {
         2: { cellWidth: 42 },
       },
       didParseCell: (data) => {
-        if (data.column.index === 1 && data.cell.raw === "✗ Deficiency") {
+        if (data.column.index === 1 && data.cell.raw === "DEFICIENCY") {
           data.cell.styles.textColor = [220, 50, 50];
+          data.cell.styles.fontStyle = "bold";
         }
-        if (data.column.index === 1 && data.cell.raw === "✓ Satisfactory") {
+        if (data.column.index === 1 && data.cell.raw === "PASS") {
           data.cell.styles.textColor = [40, 160, 40];
         }
       },
@@ -811,11 +813,11 @@ function Dashboard({ inspections, deficiencies }) {
                           </span>
                         </td>
                         <td style={{ padding: "10px 12px", color: "#ccc" }}>{ins.inspector}</td>
-                        <td style={{ padding: "10px 12px", color: "#ccc" }}>{ins.projectArea || "—"}</td>
+                        <td style={{ padding: "10px 12px", color: "#ccc" }}>{ins.projectArea || "--"}</td>
                         <td style={{ padding: "10px 12px", color: "#ccc", fontSize: 12 }}>
                           {Array.isArray(ins.subcontractors) && ins.subcontractors.length > 0
                             ? ins.subcontractors.join(", ")
-                            : ins.subcontractors || "—"}
+                            : ins.subcontractors || "--"}
                         </td>
                         <td style={{ padding: "10px 12px", textAlign: "center" }}>
                           <span style={{ background: defCount > 0 ? "#3a1a1a" : "#1a3a1a", color: defCount > 0 ? "#f44336" : "#4caf50", padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 700 }}>
