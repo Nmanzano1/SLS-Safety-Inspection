@@ -343,6 +343,16 @@ export default function App() {
     setDeficiencies(updated);
   }, [deficiencies]);
 
+  const deleteInspection = useCallback(async (id) => {
+    if (!window.confirm("Delete this inspection? This cannot be undone.")) return;
+    const updatedInspections = inspections.filter((i) => i.id !== id);
+    const updatedDefs = deficiencies.filter((d) => d.inspectionId !== id);
+    await saveData(STORAGE_KEYS.INSPECTIONS, updatedInspections);
+    await saveData(STORAGE_KEYS.DEFICIENCIES, updatedDefs);
+    setInspections(updatedInspections);
+    setDeficiencies(updatedDefs);
+  }, [inspections, deficiencies]);
+
   if (!authenticated) {
     return (
       <div style={{ minHeight: "100vh", background: "#0f1923", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', sans-serif", padding: 24 }}>
@@ -419,7 +429,7 @@ export default function App() {
 
       {/* VIEWS */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px" }}>
-        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} />}
+        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
         {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} />}
         {view === "reports" && <Reports inspections={inspections} deficiencies={deficiencies} />}
@@ -639,7 +649,7 @@ function generateInspectionPDF(inspection, deficiencies) {
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({ inspections, deficiencies }) {
+function Dashboard({ inspections, deficiencies, onDelete }) {
   const now = new Date();
   const thisMonth = inspections.filter((i) => {
     const d = new Date(i.submittedAt);
@@ -823,7 +833,7 @@ function Dashboard({ inspections, deficiencies }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #1e3a5f" }}>
-                    {["Date", "Type", "Inspector", "Project Area", "Subcontractors", "Deficiencies", "Status", ""].map((h) => (
+                    {["Date", "Type", "Inspector", "Project Area", "Subcontractors", "Deficiencies", "Status", "", ""].map((h) => (
                       <th key={h} style={{ padding: "8px 12px", textAlign: "left", color: "#666", fontWeight: 600, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>{h}</th>
                     ))}
                   </tr>
@@ -860,6 +870,14 @@ function Dashboard({ inspections, deficiencies }) {
                             style={{ background: "#1a1500", border: "1px solid #D4AF37", borderRadius: 5, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#D4AF37", whiteSpace: "nowrap" }}
                           >
                             ⬇ PDF
+                          </button>
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <button
+                            onClick={() => onDelete(ins.id)}
+                            style={{ background: "#1a0a0a", border: "1px solid #f44336", borderRadius: 5, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#f44336", whiteSpace: "nowrap" }}
+                          >
+                            🗑 Delete
                           </button>
                         </td>
                       </tr>
