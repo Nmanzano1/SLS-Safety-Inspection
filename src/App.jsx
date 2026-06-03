@@ -479,7 +479,7 @@ function cleanText(str) {
   }
   return result.replace(/\s+/g, " ").trim();
 }
-function generateInspectionPDF(inspection, deficiencies) {
+async function generateInspectionPDF(inspection, deficiencies) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 14;
@@ -493,10 +493,17 @@ function generateInspectionPDF(inspection, deficiencies) {
   doc.setFillColor(...gold);
   doc.rect(0, 28, pageW, 1, "F");
 
-  // Logo image
-  const logoData = "/sls-logo.png";
+  // Logo image - fetch at runtime
   try {
-    doc.addImage(logoData, "PNG", margin, 5, 36, 16);
+    const logoRes = await fetch("/sls-logo.png");
+    const logoBlob = await logoRes.blob();
+    const logoDataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(logoBlob);
+    });
+    doc.addImage(logoDataUrl, "PNG", margin, 5, 36, 16);
   } catch(e) {
     doc.setTextColor(...gold);
     doc.setFontSize(20);
