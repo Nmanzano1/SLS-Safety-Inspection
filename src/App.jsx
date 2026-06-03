@@ -536,7 +536,18 @@ async function generateInspectionPDF(inspection, deficiencies) {
   };
   const hiHigh = calcHI(inspection.tempHigh, inspection.humidity);
   const hiLow = calcHI(inspection.tempLow, inspection.humidity);
-  const hiStr = hiHigh ? `High: ${hiHigh}F / Low: ${hiLow || "--"}F` : "N/A";
+  // If low temp is below 80F, show actual temp instead of N/A
+  const hiLowDisplay = hiLow ? `${hiLow}F` : (inspection.tempLow ? `${inspection.tempLow}F (actual)` : "--");
+  const hiStr = hiHigh ? `High: ${hiHigh}F / Low: ${hiLowDisplay}` : "N/A";
+
+  // Heat index level helper for PDF
+  const getHILevelPDF = (hi) => {
+    if (!hi) return null;
+    if (hi >= 103) return { label: "DANGER", r: 244, g: 67, b: 54, br: 80, bg: 20, bb: 20 };
+    if (hi >= 91) return { label: "EXTREME CAUTION", r: 255, g: 152, b: 0, br: 60, bg: 30, bb: 0 };
+    if (hi >= 80) return { label: "CAUTION", r: 212, g: 175, b: 42, br: 40, bg: 30, bb: 0 };
+    return { label: "SAFE", r: 76, g: 175, b: 80, br: 20, bg: 50, bb: 20 };
+  };
 
   const infoData = [
     ["Date", inspection.date || "--", "Inspector", inspection.inspector || "--"],
@@ -560,7 +571,70 @@ async function generateInspectionPDF(inspection, deficiencies) {
     margin: { left: margin, right: margin },
   });
 
-  y = doc.lastAutoTable.finalY + 6;
+  y = doc.lastAutoTable.finalY + 4;
+
+  // Heat Index visual block
+  if (hiHigh) {
+    const hiLevel = getHILevelPDF(hiHigh);
+    const hiLowLevel = getHILevelPDF(hiLow);
+    // Background bar
+    doc.setFillColor(15, 25, 35);
+    doc.rect(margin, y, pageW - margin * 2, 22, "F");
+    doc.setDrawColor(hiLevel.r, hiLevel.g, hiLevel.b);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, pageW - margin * 2, 22);
+    // Label
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(150, 150, 150);
+    doc.text("HEAT INDEX (NWS ROTHFUSZ)", margin + 3, y + 5);
+    // High card
+    doc.setFillColor(hiLevel.br, hiLevel.bg, hiLevel.bb);
+    doc.rect(margin + 3, y + 7, 28, 13, "F");
+    doc.setFontSize(6);
+    doc.setTextColor(150, 150, 150);
+    doc.text("HIGH OF DAY", margin + 9, y + 10);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(hiLevel.r, hiLevel.g, hiLevel.b);
+    doc.text(`${hiHigh}F`, margin + 10, y + 16);
+    doc.setFontSize(6);
+    doc.text(hiLevel.label, margin + 8, y + 19);
+    // Low card
+    if (hiLow && hiLowLevel) {
+      doc.setFillColor(hiLowLevel.br, hiLowLevel.bg, hiLowLevel.bb);
+      doc.rect(margin + 35, y + 7, 28, 13, "F");
+      doc.setFontSize(6);
+      doc.setTextColor(150, 150, 150);
+      doc.text("LOW OF DAY", margin + 41, y + 10);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(hiLowLevel.r, hiLowLevel.g, hiLowLevel.b);
+      doc.text(`${hiLow}F`, margin + 42, y + 16);
+      doc.setFontSize(6);
+      doc.text(hiLowLevel.label, margin + 40, y + 19);
+    } else if (inspection.tempLow) {
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Low Temp: ${inspection.tempLow}F (below HI threshold)`, margin + 35, y + 13);
+    }
+    // Legend
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(200, 50, 50);
+    doc.text("DANGER >=103F", margin + 70, y + 10);
+    doc.setTextColor(200, 120, 0);
+    doc.text("EXTREME CAUTION 91-102F", margin + 70, y + 14);
+    doc.setTextColor(180, 150, 30);
+    doc.text("CAUTION 80-90F", margin + 70, y + 18);
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(5.5);
+    doc.text("Per EM 385-1-1 Sec.06.B — increase break frequency at Caution and above", margin + 120, y + 14);
+    y += 26;
+  } else {
+    y += 6;
+  }
 
   // Inspection Sections
   INSPECTION_SECTIONS.forEach((sec) => {
