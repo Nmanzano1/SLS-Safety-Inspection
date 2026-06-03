@@ -61,6 +61,14 @@ const SUBCONTRACTORS = [
   "Other",
 ];
 
+const SEGMENTS = [
+  "S1","S2","S2A","S3","S3A","S3B","S4","S4A","S5","S5A",
+  "S6","S6A","S7","S7A","S8","S8A","S9","S10","S10A",
+  "S11","S12","S13","S13A","S14",
+  "H1 (H9)","H2 (H10)","H3","H4","H5A (H16)","H5B",
+  "H6","H7 (H22)",
+];
+
 const INSPECTION_SECTIONS = [
   {
     id: "admin",
@@ -294,6 +302,7 @@ export default function App() {
             inspectionId: newInspection.id,
             date: formData.date,
             inspector: formData.inspector,
+            segment: formData.projectArea || "",
             subcontractors: formData.subcontractors || [],
             section: sec.label,
             item,
@@ -716,6 +725,16 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
     else defsBySub[sub].closed++;
   });
 
+  // Deficiencies by segment/location
+  const defsBySegment = {};
+  deficiencies.forEach((d) => {
+    const seg = d.segment || "Unassigned";
+    if (!defsBySegment[seg]) defsBySegment[seg] = { total: 0, open: 0, closed: 0 };
+    defsBySegment[seg].total++;
+    if (d.status === "Open") defsBySegment[seg].open++;
+    else defsBySegment[seg].closed++;
+  });
+
   // ── Controlling Employer Alert Logic ──
   const staleVerbalDefs = openDefs.filter((d) => {
     if (d.enforcementAction !== "Verbal Notice") return false;
@@ -815,7 +834,7 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
           </div>
 
           {/* BOTTOM ROW */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
             {/* Inspector Activity */}
             <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#D4AF37", marginBottom: 16 }}>Inspector Activity</div>
@@ -858,6 +877,27 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
                   <div key={sub} style={{ marginBottom: 12 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <span style={{ fontSize: 12, color: "#ccc", fontWeight: 600 }}>{sub}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#f44336" }}>{counts.total}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <span style={{ fontSize: 10, background: "#2a1a0a", color: "#ff9800", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>{counts.open} Open</span>
+                      <span style={{ fontSize: 10, background: "#1a3a1a", color: "#4caf50", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>{counts.closed} Closed</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Deficiencies by Segment */}
+            <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#D4AF37", marginBottom: 16 }}>Deficiencies by Segment</div>
+              {Object.keys(defsBySegment).length === 0 ? (
+                <div style={{ color: "#4caf50", fontSize: 13 }}>✓ No deficiencies recorded</div>
+              ) : (
+                Object.entries(defsBySegment).sort((a, b) => b[1].total - a[1].total).map(([seg, counts]) => (
+                  <div key={seg} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: "#ccc", fontWeight: 600 }}>{seg}</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#f44336" }}>{counts.total}</span>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -1121,8 +1161,11 @@ function InspectionForm({ onSubmit }) {
             <input type="text" style={fieldStyle} value={form.contractNumber} onChange={(e) => set("contractNumber", e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>Project Area / Segment</label>
-            <input type="text" style={fieldStyle} value={form.projectArea} onChange={(e) => set("projectArea", e.target.value)} placeholder="e.g., Segment 1, Chapeno" />
+            <label style={labelStyle}>Segment / Location</label>
+            <select style={fieldStyle} value={form.projectArea} onChange={(e) => set("projectArea", e.target.value)}>
+              <option value="">-- Select Segment --</option>
+              {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={labelStyle}>Subcontractors Present</label>
@@ -1456,6 +1499,7 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
                       <span style={{ background: "#1a2a3a", borderRadius: 4, padding: "2px 10px", fontSize: 11, color: "#D4AF37", fontWeight: 700 }}>{def.section}</span>
+                      {def.segment && <span style={{ background: "#0a1a2a", borderRadius: 4, padding: "2px 10px", fontSize: 11, color: "#64b5f6", fontWeight: 700 }}>📍 {def.segment}</span>}
                       <span style={{ fontSize: 12, color: "#666" }}>{def.date}</span>
                       <span style={{ fontSize: 12, color: "#888" }}>by {def.inspector}</span>
                       {def.isRepeat && <span style={{ background: "#3a0a0a", color: "#f44336", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>🔁 REPEAT</span>}
