@@ -2130,53 +2130,52 @@ function Reports({ inspections, deficiencies }) {
 
 // ─── SAFETY METRICS ────────────────────────────────────────────────────────────
 function SafetyMetrics() {
-  const METRICS_KEY = "sls_metrics";
   const INCIDENTS_KEY = "sls_incidents";
   const MANHOURS_KEY = "sls_manhours";
   const SPI_KEY = "sls_spi";
 
-  const [metrics, setMetrics] = useState(null);
-  const [incidents, setIncidents] = useState([]);
-  const [manHoursLog, setManHoursLog] = useState([]);
-  const [spiLog, setSpiLog] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const SEED_INCIDENTS = [
+    { id: "seed1", date: "2025-07-14", type: "LTI", description: "Lost Time Injury", lostDays: 1, manHoursAtTime: 483000 },
+    { id: "seed2", date: "2025-09-04", type: "Property Damage", description: "Property Damage Incident", lostDays: 0, manHoursAtTime: 483000 },
+    { id: "seed3", date: "2026-03-13", type: "Property Damage", description: "Property Damage Incident", lostDays: 0, manHoursAtTime: 483000 },
+    { id: "seed4", date: "2026-05-18", type: "Property Damage", description: "Mishap / LMI Vehicle Damage / Property Damage", lostDays: 0, manHoursAtTime: 483000 },
+  ];
+  const SEED_MH = [
+    { id: "seed_mh1", date: "2026-01-26", hours: 483000, personnel: 335, note: "Historical baseline" },
+    { id: "seed_mh2", date: "2026-06-03", hours: 3350, personnel: 335, note: "Daily entry" },
+  ];
+  const SEED_SPI = [
+    { id: "seed_spi1", date: "2026-01-26", leading: 851, lagging: 60, spi: 92.95, notes: "Jan 26 final SPI" },
+  ];
+
+  // Start with seed data immediately — no blank screen
+  const [incidents, setIncidents] = useState(SEED_INCIDENTS);
+  const [manHoursLog, setManHoursLog] = useState(SEED_MH);
+  const [spiLog, setSpiLog] = useState(SEED_SPI);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Forms
   const [mhForm, setMhForm] = useState({ date: new Date().toISOString().split("T")[0], hours: "", personnel: "" });
   const [incForm, setIncForm] = useState({ date: "", type: "LTI", description: "", lostDays: "" });
   const [spiForm, setSpiForm] = useState({ date: new Date().toISOString().split("T")[0], leading: "", lagging: "", notes: "" });
   const [saving, setSaving] = useState(false);
 
+  // Try to load from Firebase in background — if it works, update; if not, keep seed data
   useEffect(() => {
     async function load() {
       try {
-        const [m, inc, mh, spi] = await Promise.all([
-          loadData(METRICS_KEY), loadData(INCIDENTS_KEY),
-          loadData(MANHOURS_KEY), loadData(SPI_KEY)
+        const [inc, mh, spi] = await Promise.all([
+          loadData(INCIDENTS_KEY), loadData(MANHOURS_KEY), loadData(SPI_KEY)
         ]);
-        // Seed with historical data if empty
-        const seedIncidents = inc.length ? inc : [
-          { id: "seed1", date: "2025-07-14", type: "LTI", description: "Lost Time Injury", lostDays: 1, manHoursAtTime: 483000 },
-          { id: "seed2", date: "2025-09-04", type: "Property Damage", description: "Property Damage Incident", lostDays: 0, manHoursAtTime: 483000 },
-          { id: "seed3", date: "2026-03-13", type: "Property Damage", description: "Property Damage Incident", lostDays: 0, manHoursAtTime: 483000 },
-          { id: "seed4", date: "2026-05-18", type: "Property Damage", description: "Mishap / LMI Vehicle Damage / Property Damage", lostDays: 0, manHoursAtTime: 483000 },
-        ];
-        const seedMH = mh.length ? mh : [
-          { id: "seed_mh1", date: "2026-01-26", hours: 483000, personnel: 335, note: "Historical baseline" },
-          { id: "seed_mh2", date: "2026-06-03", hours: 3350, personnel: 335, note: "Daily entry" },
-        ];
-        const seedSPI = spi.length ? spi : [
-          { id: "seed_spi1", date: "2026-01-26", leading: 851, lagging: 60, spi: 92.95, notes: "Jan 26 final SPI" },
-        ];
-        if (!inc.length) await saveData(INCIDENTS_KEY, seedIncidents);
-        if (!mh.length) await saveData(MANHOURS_KEY, seedMH);
-        if (!spi.length) await saveData(SPI_KEY, seedSPI);
-        setIncidents(seedIncidents);
-        setManHoursLog(seedMH);
-        setSpiLog(seedSPI);
-      } catch(e) { console.error(e); }
-      setLoading(false);
+        if (inc && inc.length) setIncidents(inc);
+        else { await saveData(INCIDENTS_KEY, SEED_INCIDENTS); }
+        if (mh && mh.length) setManHoursLog(mh);
+        else { await saveData(MANHOURS_KEY, SEED_MH); }
+        if (spi && spi.length) setSpiLog(spi);
+        else { await saveData(SPI_KEY, SEED_SPI); }
+      } catch(e) {
+        console.error("Metrics Firebase load failed, using seed data:", e);
+      }
     }
     load();
   }, []);
