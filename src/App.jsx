@@ -1777,6 +1777,24 @@ function Reports({ inspections, deficiencies }) {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
+  // Load metrics data from Firebase
+  const [incidents, setIncidents] = useState([]);
+  const [manHoursLog, setManHoursLog] = useState([]);
+  const [spiLog, setSpiLog] = useState([]);
+  useEffect(() => {
+    async function loadMetrics() {
+      try {
+        const [inc, mh, spi] = await Promise.all([
+          loadData("sls_incidents"), loadData("sls_manhours"), loadData("sls_spi")
+        ]);
+        setIncidents(inc || []);
+        setManHoursLog(mh || []);
+        setSpiLog(spi || []);
+      } catch(e) {}
+    }
+    loadMetrics();
+  }, []);
+
   const exportInspectionsCSV = () => {
     const headers = ["Date","Submitted At","Inspection Type","Inspector","Contract #","Project Area","Weather","Temp High","Temp Low","Humidity","Subcontractors","Toolbox Topic","Near Misses","General Observations","AHA Signed In","Remarking Required","Utility Strike","Utility Strike Type","Utility Strike Details","Additional Notes"];
     const rows = inspections.map(i => [
@@ -1997,6 +2015,115 @@ function Reports({ inspections, deficiencies }) {
           )}
         </div>
       )}
+
+      {/* ── SAFETY METRICS SUMMARY ── */}
+      {(() => {
+        const MULT = 200000;
+        const totalMH = manHoursLog.reduce((s, e) => s + (parseFloat(e.hours) || 0), 0);
+        const ltiCount = incidents.filter(i => i.type === "LTI").length;
+        const recordable = incidents.filter(i => i.type === "LTI" || i.type === "Recordable").length;
+        const nearMissCount = incidents.filter(i => i.type === "Near Miss").length;
+        const propDmg = incidents.filter(i => i.type === "Property Damage").length;
+        const dartCount = incidents.filter(i => i.type === "LTI" && parseInt(i.lostDays) > 0).length;
+        const LTIFR = totalMH > 0 ? ((ltiCount * MULT) / totalMH).toFixed(2) : "0.00";
+        const TRIR = totalMH > 0 ? ((recordable * MULT) / totalMH).toFixed(2) : "0.00";
+        const DART = totalMH > 0 ? ((dartCount * MULT) / totalMH).toFixed(2) : "0.00";
+        const NMR = totalMH > 0 ? ((nearMissCount * MULT) / totalMH).toFixed(2) : "0.00";
+        const latestSPI = spiLog.length ? [...spiLog].sort((a,b) => new Date(b.date)-new Date(a.date))[0] : null;
+        const lastLTIinc = [...incidents].filter(i => i.type === "LTI").sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+        const daysClean = lastLTIinc ? Math.floor((new Date() - new Date(lastLTIinc.date)) / 86400000) : "--";
+        const pctBelowIndustry = parseFloat(TRIR) > 0 ? ((2.55 - parseFloat(TRIR)) / 2.55 * 100).toFixed(0) : 100;
+
+        return (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#D4AF37", marginBottom: 16, paddingTop: 16, borderTop: "2px solid #1e3a5f", letterSpacing: 1 }}>
+              📉 SAFETY PERFORMANCE METRICS — CONTRACT #70B01C23F00001236
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+              {/* Lagging Rates */}
+              <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: "3px solid #f44336", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #1e3a5f" }}>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: "#f44336", letterSpacing: 1, textTransform: "uppercase" }}>▼ Lagging Indicators</div>
+                  <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>Using 200,000 hr multiplier · All-time cumulative</div>
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <tbody>
+                    {[
+                      ["Total Man-Hours", totalMH.toLocaleString(), "#4caf50"],
+                      ["LTIFR", LTIFR, parseFloat(LTIFR) < 1.5 ? "#4caf50" : "#f44336"],
+                      ["TRIR", TRIR, parseFloat(TRIR) < 2.3 ? "#4caf50" : "#f44336"],
+                      ["DART Rate", DART, parseFloat(DART) < 1.2 ? "#4caf50" : "#f44336"],
+                      ["Near Miss Rate", NMR, "#ff9800"],
+                      ["Industry Avg TRIR", "2.3 – 2.8", "#888"],
+                      ["% Below Industry Avg", `${pctBelowIndustry}%`, "#4caf50"],
+                      ["Property Damage Incidents", propDmg, propDmg > 0 ? "#ff9800" : "#4caf50"],
+                      ["Days Without Lost-Time Accident", daysClean, "#4caf50"],
+                    ].map(([l,v,c]) => (
+                      <tr key={l} style={{ borderBottom: "1px solid #1a2a3a" }}>
+                        <td style={{ padding: "9px 16px", fontSize: 13, color: "#ccc" }}>{l}</td>
+                        <td style={{ padding: "9px 16px", fontSize: 14, fontWeight: 700, color: c, textAlign: "right" }}>{v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Leading / SPI */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: "3px solid #4caf50", borderRadius: 8, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 18px", borderBottom: "1px solid #1e3a5f" }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: "#4caf50", letterSpacing: 1, textTransform: "uppercase" }}>▲ Leading Indicators</div>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                      {[
+                        ["Total Inspections (All-time)", inspections.length, "#4caf50"],
+                        ["Toolbox Talks (This Month)", toolboxTopics.length, "#4caf50"],
+                        ["Monthly Compliance Rate", `${complianceRate}%`, complianceRate >= 90 ? "#4caf50" : "#ff9800"],
+                      ].map(([l,v,c]) => (
+                        <tr key={l} style={{ borderBottom: "1px solid #1a2a3a" }}>
+                          <td style={{ padding: "9px 16px", fontSize: 13, color: "#ccc" }}>{l}</td>
+                          <td style={{ padding: "9px 16px", fontSize: 14, fontWeight: 700, color: c, textAlign: "right" }}>{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* SPI */}
+                {latestSPI && (
+                  <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: "3px solid #D4AF37", borderRadius: 8, padding: 20 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: "#D4AF37", letterSpacing: 1, textTransform: "uppercase", marginBottom: 14 }}>🎯 Safety Performance Index</div>
+                    <div style={{ fontSize: 42, fontWeight: 900, color: latestSPI.spi >= 95 ? "#4caf50" : latestSPI.spi >= 85 ? "#D4AF37" : "#f44336" }}>{latestSPI.spi}%</div>
+                    <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>Formula: (L - Lag) ÷ L × 100</div>
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>Leading: {latestSPI.leading} · Lagging: {latestSPI.lagging}</div>
+                    <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>As of {latestSPI.date}</div>
+                  </div>
+                )}
+
+                {/* Incident Summary */}
+                <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>Incident Summary</div>
+                  {incidents.length === 0 ? <div style={{ color: "#4caf50", fontSize: 13 }}>✓ No incidents recorded</div> :
+                    [...incidents].sort((a,b) => new Date(b.date)-new Date(a.date)).map(inc => (
+                      <div key={inc.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #1a2a3a" }}>
+                        <span style={{ fontSize: 11, color: "#555", minWidth: 80 }}>{inc.date}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 4,
+                          background: inc.type==="LTI"?"#3a1a1a":inc.type==="Near Miss"?"#2a1500":"#1a1a2a",
+                          color: inc.type==="LTI"?"#f44336":inc.type==="Near Miss"?"#ff9800":"#64b5f6" }}>
+                          {inc.type}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#ccc", flex: 1 }}>{inc.description}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2069,9 +2196,9 @@ function SafetyMetrics() {
   const nearMissRate = totalManHours > 0 ? ((nearMissCount * MULT) / totalManHours).toFixed(2) : "0.00";
 
   // Days without incident
-  const lastIncident = [...incidents].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-  const daysWithoutIncident = lastIncident
-    ? Math.floor((new Date() - new Date(lastIncident.date)) / (1000 * 60 * 60 * 24))
+  const lastLTI = [...incidents].filter(i => i.type === "LTI").sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  const daysWithoutIncident = lastLTI
+    ? Math.floor((new Date() - new Date(lastLTI.date)) / (1000 * 60 * 60 * 24))
     : "--";
 
   // Latest SPI
@@ -2154,7 +2281,7 @@ function SafetyMetrics() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#4caf50", textTransform: "uppercase", marginBottom: 10 }}>▲ Leading</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
             <MetCard label="Total Man-Hours" value={totalManHours.toLocaleString()} sub="Cumulative" color="#4caf50" />
-            <MetCard label="Days Without Incident" value={daysWithoutIncident} sub={lastIncident ? `Last: ${lastIncident.date}` : "No incidents"} color="#4caf50" />
+            <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastIncident ? `Last: ${lastIncident.date}` : "No incidents"} color="#4caf50" />
             <MetCard label="Current SPI" value={latestSPI ? `${latestSPI.spi}%` : "--"} sub={latestSPI ? `As of ${latestSPI.date}` : "No SPI entries"} color="#D4AF37" />
             <MetCard label="Toolbox Talk Hrs" value="2,060+" sub="Auto-tracked from inspections" color="#4caf50" />
           </div>
