@@ -706,6 +706,16 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
     defsBySection[d.section]++;
   });
 
+  // Deficiencies by subcontractor — use responsible party if set, otherwise fall back to inspection subcontractors
+  const defsBySub = {};
+  deficiencies.forEach((d) => {
+    const sub = d.responsibleParty || (Array.isArray(d.subcontractors) && d.subcontractors[0]) || "Unassigned";
+    if (!defsBySub[sub]) defsBySub[sub] = { total: 0, open: 0, closed: 0 };
+    defsBySub[sub].total++;
+    if (d.status === "Open") defsBySub[sub].open++;
+    else defsBySub[sub].closed++;
+  });
+
   // ── Controlling Employer Alert Logic ──
   const staleVerbalDefs = openDefs.filter((d) => {
     if (d.enforcementAction !== "Verbal Notice") return false;
@@ -805,7 +815,7 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
           </div>
 
           {/* BOTTOM ROW */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
             {/* Inspector Activity */}
             <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#D4AF37", marginBottom: 16 }}>Inspector Activity</div>
@@ -832,6 +842,27 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ height: 8, width: Math.max(30, count * 30), background: "linear-gradient(90deg,#b71c1c,#f44336)", borderRadius: 4, maxWidth: 100 }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#f44336", minWidth: 20, textAlign: "right" }}>{count}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Deficiencies by Subcontractor */}
+            <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#D4AF37", marginBottom: 16 }}>Deficiencies by Subcontractor</div>
+              {Object.keys(defsBySub).length === 0 ? (
+                <div style={{ color: "#4caf50", fontSize: 13 }}>✓ No deficiencies recorded</div>
+              ) : (
+                Object.entries(defsBySub).sort((a, b) => b[1].total - a[1].total).map(([sub, counts]) => (
+                  <div key={sub} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: "#ccc", fontWeight: 600 }}>{sub}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#f44336" }}>{counts.total}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <span style={{ fontSize: 10, background: "#2a1a0a", color: "#ff9800", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>{counts.open} Open</span>
+                      <span style={{ fontSize: 10, background: "#1a3a1a", color: "#4caf50", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>{counts.closed} Closed</span>
                     </div>
                   </div>
                 ))
@@ -1727,6 +1758,33 @@ function Reports({ inspections, deficiencies }) {
               ))}
             </div>
           )}
+
+          {/* DEFICIENCY BY SUBCONTRACTOR */}
+          {monthDefs.length > 0 && (() => {
+            const subCounts = {};
+            monthDefs.forEach((d) => {
+              const sub = d.responsibleParty || (Array.isArray(d.subcontractors) && d.subcontractors[0]) || "Unassigned";
+              if (!subCounts[sub]) subCounts[sub] = { total: 0, open: 0, closed: 0 };
+              subCounts[sub].total++;
+              if (d.status === "Open") subCounts[sub].open++;
+              else subCounts[sub].closed++;
+            });
+            return (
+              <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>Deficiencies by Subcontractor</div>
+                {Object.entries(subCounts).sort((a, b) => b[1].total - a[1].total).map(([sub, counts]) => (
+                  <div key={sub} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1a2a3a" }}>
+                    <span style={{ fontSize: 13, color: "#ccc", fontWeight: 600 }}>{sub}</span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <span style={{ fontSize: 11, background: "#2a1a0a", color: "#ff9800", padding: "2px 10px", borderRadius: 10, fontWeight: 700 }}>{counts.open} Open</span>
+                      <span style={{ fontSize: 11, background: "#1a3a1a", color: "#4caf50", padding: "2px 10px", borderRadius: 10, fontWeight: 700 }}>{counts.closed} Closed</span>
+                      <span style={{ fontSize: 11, color: "#f44336", fontWeight: 700, minWidth: 20, textAlign: "right" }}>{counts.total} Total</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* DEFICIENCY BREAKDOWN */}
           {monthDefs.length > 0 && (
