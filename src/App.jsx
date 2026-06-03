@@ -1103,11 +1103,14 @@ function InspectionForm({ onSubmit }) {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&current=relative_humidity_2m,temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
       const res = await fetch(url);
       const data = await res.json();
-      const humidity = Math.round(data.current.relative_humidity_2m);
-      const tempHigh = Math.round(data.daily.temperature_2m_max[0]);
-      const tempLow = Math.round(data.daily.temperature_2m_min[0]);
-      const wCode = data.current.weather_code;
-      // Map weather code to condition
+      console.log("Weather API response:", JSON.stringify(data));
+      const humidity = data.current && data.current.relative_humidity_2m != null
+        ? Math.round(data.current.relative_humidity_2m) : "";
+      const tempHigh = data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max.length > 0
+        ? Math.round(data.daily.temperature_2m_max[0]) : "";
+      const tempLow = data.daily && data.daily.temperature_2m_min && data.daily.temperature_2m_min.length > 0
+        ? Math.round(data.daily.temperature_2m_min[0]) : "";
+      const wCode = data.current ? data.current.weather_code : 0;
       const weatherCondition = wCode <= 1 ? "Clear / Sunny" :
         wCode <= 3 ? "Partly Cloudy" :
         wCode <= 49 ? "Overcast / Cloudy" :
@@ -1115,7 +1118,14 @@ function InspectionForm({ onSubmit }) {
         wCode <= 77 ? "Overcast / Cloudy" :
         wCode <= 82 ? "Rain / Thunderstorm" :
         wCode <= 99 ? "Rain / Thunderstorm" : "Clear / Sunny";
-      setForm(f => ({ ...f, humidity: String(humidity), tempHigh: String(tempHigh), tempLow: String(tempLow), weather: weatherCondition }));
+      console.log("Parsed:", { humidity, tempHigh, tempLow, weatherCondition });
+      setForm(f => ({
+        ...f,
+        humidity: String(humidity),
+        tempHigh: String(tempHigh),
+        tempLow: String(tempLow),
+        weather: weatherCondition
+      }));
     } catch (e) {
       console.error("Weather fetch failed:", e);
     } finally {
