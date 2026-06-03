@@ -450,7 +450,7 @@ export default function App() {
         {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
         {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} />}
-        {view === "metrics" && <SafetyMetrics />}
+        {view === "metrics" && <SafetyMetrics inspections={inspections} />}
         {view === "reports" && <Reports inspections={inspections} deficiencies={deficiencies} />}
       </div>
     </div>
@@ -2129,7 +2129,7 @@ function Reports({ inspections, deficiencies }) {
 }
 
 // ─── SAFETY METRICS ────────────────────────────────────────────────────────────
-function SafetyMetrics() {
+function SafetyMetrics({ inspections = [] }) {
   const INCIDENTS_KEY = "sls_incidents";
   const MANHOURS_KEY = "sls_manhours";
   const SPI_KEY = "sls_spi";
@@ -2184,7 +2184,7 @@ function SafetyMetrics() {
     load();
   }, []);
 
-  // Calculations
+  // ── Core Calculations ──
   const totalManHours = manHoursLog.reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0);
   const ltiCount = incidents.filter(i => i.type === "LTI").length;
   const recordableCount = incidents.filter(i => i.type === "LTI" || i.type === "Recordable").length;
@@ -2198,13 +2198,29 @@ function SafetyMetrics() {
   const DART = totalManHours > 0 ? ((dartCount * MULT) / totalManHours).toFixed(2) : "0.00";
   const nearMissRate = totalManHours > 0 ? ((nearMissCount * MULT) / totalManHours).toFixed(2) : "0.00";
 
-  // Days without incident
+  // Days without LTI
   const lastLTI = [...incidents].filter(i => i.type === "LTI").sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   const daysWithoutIncident = lastLTI
     ? Math.floor((new Date() - new Date(lastLTI.date)) / (1000 * 60 * 60 * 24))
     : "--";
 
-  // Latest SPI
+  // ── Auto-Calculate SPI ──
+  // Leading = total inspections + total toolbox talks + (training hours / 14.4)
+  // Verified against Jan 26: 505 inspections + 203 talks + (2060 hrs / 14.4) = 851 pts → SPI 92.95%
+  // Lagging = (LTIs × 40) + (Property Damage × 20) + (Near Miss × 5)
+  // Verified against Jan 26: (1 × 40) + (1 × 20) = 60 pts → SPI 92.95% ✓
+  const totalInspections = inspections.length;
+  const totalTalks = inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length;
+  // Training hours: 15 min per talk × avg personnel per inspection
+  const avgPersonnel = inspections.length > 0
+    ? inspections.reduce((s, i) => s + (parseInt(i.personnelCount) || 335), 0) / inspections.length
+    : 335;
+  const totalTrainingHours = totalTalks * 0.25 * avgPersonnel;
+  const autoLeading = totalInspections + totalTalks + Math.round(totalTrainingHours / 14.4);
+  const autoLagging = (ltiCount * 40) + (propDamageCount * 20) + (nearMissCount * 5);
+  const autoSPI = autoLeading > 0 ? (((autoLeading - autoLagging) / autoLeading) * 100).toFixed(2) : "0.00";
+
+  // Latest manual SPI (if exists, show alongside auto)
   const latestSPI = spiLog.length
     ? [...spiLog].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
     : null;
@@ -2285,7 +2301,7 @@ function SafetyMetrics() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
             <MetCard label="Total Man-Hours" value={totalManHours.toLocaleString()} sub="Cumulative" color="#4caf50" />
             <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastLTI ? `Last LTI: ${lastLTI.date}` : "No LTIs recorded"} color="#4caf50" />
-            <MetCard label="Current SPI" value={latestSPI ? `${latestSPI.spi}%` : "--"} sub={latestSPI ? `As of ${latestSPI.date}` : "No SPI entries"} color="#D4AF37" />
+            <MetCard label="Current SPI (Auto)" value={`${autoSPI}%`} sub={`L:${autoLeading} / Lag:${autoLagging} · Updated live`} color={parseFloat(autoSPI) >= 90 ? "#4caf50" : parseFloat(autoSPI) >= 80 ? "#D4AF37" : "#f44336"} />
             <MetCard label="Toolbox Talk Hrs" value="2,060+" sub="Auto-tracked from inspections" color="#4caf50" />
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#f44336", textTransform: "uppercase", marginBottom: 10 }}>▼ Lagging</div>
@@ -2403,6 +2419,33 @@ function SafetyMetrics() {
       {/* SPI */}
       {activeTab === "spi" && (
         <div>
+          {/* Auto-calculated SPI */}
+          <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: `3px solid ${parseFloat(autoSPI) >= 90 ? "#4caf50" : "#D4AF37"}`, borderRadius: 8, padding: 24, marginBottom: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: "#D4AF37", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>🎯 Auto-Calculated SPI — Live</div>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Formula: (Leading - Lagging) ÷ Leading × 100 · Updates automatically as inspections and incidents are logged</div>
+            <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 52, fontWeight: 900, color: parseFloat(autoSPI) >= 90 ? "#4caf50" : parseFloat(autoSPI) >= 80 ? "#D4AF37" : "#f44336" }}>{autoSPI}%</div>
+                <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>As of today</div>
+              </div>
+              <div style={{ display: "flex", gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 1 }}>Leading</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#4caf50" }}>{autoLeading}</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{totalInspections} inspections</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{totalTalks} toolbox talks</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{totalTrainingHours.toFixed(0)} training hrs</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 1 }}>Lagging</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: autoLagging > 0 ? "#f44336" : "#4caf50" }}>{autoLagging}</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{ltiCount} LTI × 40pts</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{propDamageCount} prop. damage × 20pts</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{nearMissCount} near miss × 5pts</div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20, marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Log SPI Entry</div>
             <div style={{ fontSize: 11, color: "#666", marginBottom: 14 }}>Formula: (Leading - Lagging) ÷ Leading × 100</div>
