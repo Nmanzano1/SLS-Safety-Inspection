@@ -577,63 +577,79 @@ async function generateInspectionPDF(inspection, deficiencies) {
   if (hiHigh) {
     const hiLevel = getHILevelPDF(hiHigh);
     const hiLowLevel = getHILevelPDF(hiLow);
+    const blockH = 28;
     // Background bar
     doc.setFillColor(15, 25, 35);
-    doc.rect(margin, y, pageW - margin * 2, 22, "F");
+    doc.rect(margin, y, pageW - margin * 2, blockH, "F");
     doc.setDrawColor(hiLevel.r, hiLevel.g, hiLevel.b);
     doc.setLineWidth(0.5);
-    doc.rect(margin, y, pageW - margin * 2, 22);
-    // Label
-    doc.setFontSize(7);
+    doc.rect(margin, y, pageW - margin * 2, blockH);
+    // Section label
+    doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(150, 150, 150);
-    doc.text("HEAT INDEX (NWS ROTHFUSZ)", margin + 3, y + 5);
+    doc.setTextColor(130, 130, 130);
+    doc.text("HEAT INDEX (NWS ROTHFUSZ)  |  EM 385-1-1 Sec.06.B", margin + 3, y + 5);
+
     // High card
     doc.setFillColor(hiLevel.br, hiLevel.bg, hiLevel.bb);
-    doc.rect(margin + 3, y + 7, 28, 13, "F");
-    doc.setFontSize(6);
-    doc.setTextColor(150, 150, 150);
-    doc.text("HIGH OF DAY", margin + 9, y + 10);
-    doc.setFontSize(11);
+    doc.rect(margin + 3, y + 8, 32, 17, "F");
+    doc.setFontSize(5.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(160, 160, 160);
+    doc.text("HIGH OF DAY", margin + 9, y + 12);
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(hiLevel.r, hiLevel.g, hiLevel.b);
-    doc.text(`${hiHigh}F`, margin + 10, y + 16);
-    doc.setFontSize(6);
-    doc.text(hiLevel.label, margin + 8, y + 19);
-    // Low card
+    doc.text(`${hiHigh}F`, margin + 9, y + 19);
+    doc.setFontSize(5.5);
+    doc.text(hiLevel.label, margin + 8, y + 23);
+
+    // Low card or actual temp
     if (hiLow && hiLowLevel) {
       doc.setFillColor(hiLowLevel.br, hiLowLevel.bg, hiLowLevel.bb);
-      doc.rect(margin + 35, y + 7, 28, 13, "F");
-      doc.setFontSize(6);
-      doc.setTextColor(150, 150, 150);
-      doc.text("LOW OF DAY", margin + 41, y + 10);
-      doc.setFontSize(11);
+      doc.rect(margin + 38, y + 8, 32, 17, "F");
+      doc.setFontSize(5.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(160, 160, 160);
+      doc.text("LOW OF DAY", margin + 44, y + 12);
+      doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(hiLowLevel.r, hiLowLevel.g, hiLowLevel.b);
-      doc.text(`${hiLow}F`, margin + 42, y + 16);
-      doc.setFontSize(6);
-      doc.text(hiLowLevel.label, margin + 40, y + 19);
+      doc.text(`${hiLow}F`, margin + 44, y + 19);
+      doc.setFontSize(5.5);
+      doc.text(hiLowLevel.label, margin + 42, y + 23);
     } else if (inspection.tempLow) {
-      doc.setFontSize(7);
+      doc.setFillColor(25, 35, 45);
+      doc.rect(margin + 38, y + 8, 42, 17, "F");
+      doc.setFontSize(5.5);
       doc.setFont("helvetica", "normal");
+      doc.setTextColor(130, 130, 130);
+      doc.text("LOW OF DAY", margin + 44, y + 12);
+      doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(`Low Temp: ${inspection.tempLow}F (below HI threshold)`, margin + 35, y + 13);
+      doc.text(`${inspection.tempLow}F`, margin + 44, y + 19);
+      doc.setFontSize(5.5);
+      doc.text("below HI threshold", margin + 40, y + 23);
     }
-    // Legend
+
+    // Legend - right side
+    const lx = margin + 85;
     doc.setFontSize(6);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(244, 67, 54);
+    doc.text("DANGER >=103F", lx, y + 11);
+    doc.setTextColor(255, 152, 0);
+    doc.text("EXTREME CAUTION 91-102F", lx, y + 16);
+    doc.setTextColor(212, 175, 42);
+    doc.text("CAUTION 80-90F", lx, y + 21);
+    doc.setFontSize(5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(200, 50, 50);
-    doc.text("DANGER >=103F", margin + 70, y + 10);
-    doc.setTextColor(200, 120, 0);
-    doc.text("EXTREME CAUTION 91-102F", margin + 70, y + 14);
-    doc.setTextColor(180, 150, 30);
-    doc.text("CAUTION 80-90F", margin + 70, y + 18);
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(5.5);
-    doc.text("Per EM 385-1-1 Sec.06.B — increase break frequency at Caution and above", margin + 120, y + 14);
-    y += 26;
+    doc.setTextColor(120, 120, 120);
+    doc.text("Increase break frequency and water intake at Caution and above.", lx, y + 26);
+
+    y += blockH + 4;
   } else {
-    y += 6;
+    y += 4;
   }
 
   // Inspection Sections
