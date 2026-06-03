@@ -2205,17 +2205,14 @@ function SafetyMetrics({ inspections = [] }) {
     : "--";
 
   // ── Auto-Calculate SPI ──
-  // Leading = total inspections + total toolbox talks + (training hours / 14.4)
-  // Verified against Jan 26: 505 inspections + 203 talks + (2060 hrs / 14.4) = 851 pts → SPI 92.95%
-  // Lagging = (LTIs × 40) + (Property Damage × 20) + (Near Miss × 5)
-  // Verified against Jan 26: (1 × 40) + (1 × 20) = 60 pts → SPI 92.95% ✓
-  const totalInspections = inspections.length;
-  const totalTalks = inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length;
-  // Training hours: 15 min per talk × avg personnel per inspection
-  const avgPersonnel = inspections.length > 0
-    ? inspections.reduce((s, i) => s + (parseInt(i.personnelCount) || 335), 0) / inspections.length
-    : 335;
-  const totalTrainingHours = totalTalks * 0.25 * avgPersonnel;
+  // Historical baseline as of Jan 26, 2026
+  const BASELINE_INSPECTIONS = 505;
+  const BASELINE_TALKS = 203;
+  const BASELINE_TRAINING_HRS = 2060;
+  // Point weights verified against Jan 26: 851 leading, 60 lagging = 92.95% SPI
+  const totalInspections = BASELINE_INSPECTIONS + inspections.length;
+  const totalTalks = BASELINE_TALKS + inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length;
+  const totalTrainingHours = BASELINE_TRAINING_HRS + (inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length * 0.25 * 335);
   const autoLeading = totalInspections + totalTalks + Math.round(totalTrainingHours / 14.4);
   const autoLagging = (ltiCount * 40) + (propDamageCount * 20) + (nearMissCount * 5);
   const autoSPI = autoLeading > 0 ? (((autoLeading - autoLagging) / autoLeading) * 100).toFixed(2) : "0.00";
@@ -2302,7 +2299,7 @@ function SafetyMetrics({ inspections = [] }) {
             <MetCard label="Total Man-Hours" value={totalManHours.toLocaleString()} sub="Cumulative" color="#4caf50" />
             <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastLTI ? `Last LTI: ${lastLTI.date}` : "No LTIs recorded"} color="#4caf50" />
             <MetCard label="Current SPI (Auto)" value={`${autoSPI}%`} sub={`L:${autoLeading} / Lag:${autoLagging} · Updated live`} color={parseFloat(autoSPI) >= 90 ? "#4caf50" : parseFloat(autoSPI) >= 80 ? "#D4AF37" : "#f44336"} />
-            <MetCard label="Toolbox Talk Hrs" value="2,060+" sub="Auto-tracked from inspections" color="#4caf50" />
+            <MetCard label="Toolbox Talk Hours" value={`${totalTrainingHours.toFixed(0)}+`} sub={`${totalTalks} talks total · 15 min × 335 workers`} color="#4caf50" />
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#f44336", textTransform: "uppercase", marginBottom: 10 }}>▼ Lagging</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
