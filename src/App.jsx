@@ -2280,7 +2280,7 @@ function SafetyMetrics() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#4caf50", textTransform: "uppercase", marginBottom: 10 }}>▲ Leading</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
             <MetCard label="Total Man-Hours" value={totalManHours.toLocaleString()} sub="Cumulative" color="#4caf50" />
-            <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastIncident ? `Last: ${lastIncident.date}` : "No incidents"} color="#4caf50" />
+            <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastLTI ? `Last LTI: ${lastLTI.date}` : "No LTIs recorded"} color="#4caf50" />
             <MetCard label="Current SPI" value={latestSPI ? `${latestSPI.spi}%` : "--"} sub={latestSPI ? `As of ${latestSPI.date}` : "No SPI entries"} color="#D4AF37" />
             <MetCard label="Toolbox Talk Hrs" value="2,060+" sub="Auto-tracked from inspections" color="#4caf50" />
           </div>
