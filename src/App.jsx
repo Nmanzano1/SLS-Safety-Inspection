@@ -499,10 +499,21 @@ function generateInspectionPDF(inspection, deficiencies) {
   doc.setFont("helvetica", "normal");
   doc.setTextColor(50, 50, 50);
 
+  const calcHI = (t, rh) => {
+    if (!t || !rh || parseFloat(t) < 80) return null;
+    const T = parseFloat(t); const R = parseFloat(rh);
+    if (isNaN(T) || isNaN(R)) return null;
+    return Math.round(-42.379 + 2.04901523*T + 10.14333127*R - 0.22475541*T*R - 0.00683783*T*T - 0.05481717*R*R + 0.00122874*T*T*R + 0.00085282*T*R*R - 0.00000199*T*T*R*R);
+  };
+  const hiHigh = calcHI(inspection.tempHigh, inspection.humidity);
+  const hiLow = calcHI(inspection.tempLow, inspection.humidity);
+  const hiStr = hiHigh ? `High: ${hiHigh}F / Low: ${hiLow || "--"}F` : "N/A";
+
   const infoData = [
     ["Date", inspection.date || "--", "Inspector", inspection.inspector || "--"],
     ["Project Area", inspection.projectArea || "--", "Weather", inspection.weather || "--"],
-    ["Subcontractors", Array.isArray(inspection.subcontractors) ? inspection.subcontractors.join(", ") : (inspection.subcontractors || "--"), "Temp High / Low", `${inspection.tempHigh || "--"}°F / ${inspection.tempLow || "--"}°F`],
+    ["Subcontractors", Array.isArray(inspection.subcontractors) ? inspection.subcontractors.join(", ") : (inspection.subcontractors || "--"), "Temp High / Low", `${inspection.tempHigh || "--"}F / ${inspection.tempLow || "--"}F`],
+    ["Heat Index", hiStr, "Humidity", inspection.humidity ? `${inspection.humidity}%` : "--"],
     ["AHA Sign-In Verified", inspection.ahaSignedIn ? "YES" : "NO", "Toolbox Talk", inspection.toolboxTopic || "None"],
   ];
 
@@ -568,7 +579,9 @@ function generateInspectionPDF(inspection, deficiencies) {
   });
 
   // Deficiencies section
-  const inspDefs = deficiencies.filter(d => d.inspectionId === inspection.id);
+  const inspDefs = deficiencies
+    .filter(d => d.inspectionId === inspection.id)
+    .sort((a, b) => (a.responsibleParty || "").localeCompare(b.responsibleParty || ""));
   if (inspDefs.length > 0) {
     doc.autoTable({
       startY: y,
@@ -1399,7 +1412,11 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map((def) => {
+          {[...filtered].sort((a, b) => {
+            const pa = a.responsibleParty || a.subcontractors?.[0] || "zzz";
+            const pb = b.responsibleParty || b.subcontractors?.[0] || "zzz";
+            return pa.localeCompare(pb);
+          }).map((def) => {
             const isEditing = editingId === def.id;
             const isOverdue = def.dueDate && new Date(def.dueDate) < new Date() && def.status === "Open";
             return (
@@ -1438,7 +1455,12 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 700, color: "#888", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Responsible Party</label>
-                        <input type="text" style={{ width: "100%", background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 6, color: "#e8e8e8", padding: "8px 10px", fontSize: 13, boxSizing: "border-box" }} value={editData.responsibleParty} onChange={(e) => setEditData((d) => ({ ...d, responsibleParty: e.target.value }))} placeholder="Name / company" />
+                        <select style={{ width: "100%", background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 6, color: "#e8e8e8", padding: "8px 10px", fontSize: 13, boxSizing: "border-box" }} value={editData.responsibleParty} onChange={(e) => setEditData((d) => ({ ...d, responsibleParty: e.target.value }))}>
+                          <option value="">-- Select Subcontractor --</option>
+                          {SUBCONTRACTORS.filter(s => s !== "Other").map(s => <option key={s} value={s}>{s}</option>)}
+                          <option value="SLS Safety">SLS Safety</option>
+                          <option value="Other">Other</option>
+                        </select>
                       </div>
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 700, color: "#888", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Enforcement Action</label>
@@ -1447,6 +1469,7 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                           <option>Written Notice</option>
                           <option>Written Violation</option>
                           <option>Stop-Work Order</option>
+                          <option>SLS to Correct</option>
                         </select>
                       </div>
                       <div>
@@ -1481,8 +1504,8 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                     {def.enforcementAction && (
                       <span style={{
                         marginLeft: 12, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
-                        background: def.enforcementAction === "Stop-Work Order" ? "#3a1a1a" : def.enforcementAction === "Written Violation" ? "#2a1500" : def.enforcementAction === "Written Notice" ? "#1a1a2a" : "#1a1a1a",
-                        color: def.enforcementAction === "Stop-Work Order" ? "#f44336" : def.enforcementAction === "Written Violation" ? "#ff9800" : def.enforcementAction === "Written Notice" ? "#64b5f6" : "#888",
+                        background: def.enforcementAction === "Stop-Work Order" ? "#3a1a1a" : def.enforcementAction === "Written Violation" ? "#2a1500" : def.enforcementAction === "Written Notice" ? "#1a1a2a" : def.enforcementAction === "SLS to Correct" ? "#0a1a2a" : "#1a1a1a",
+                        color: def.enforcementAction === "Stop-Work Order" ? "#f44336" : def.enforcementAction === "Written Violation" ? "#ff9800" : def.enforcementAction === "Written Notice" ? "#64b5f6" : def.enforcementAction === "SLS to Correct" ? "#4caf50" : "#888",
                       }}>
                         {def.enforcementAction}
                       </span>
