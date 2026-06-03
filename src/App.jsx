@@ -2141,8 +2141,7 @@ function SafetyMetrics() {
     { id: "seed4", date: "2026-05-18", type: "Property Damage", description: "Mishap / LMI Vehicle Damage / Property Damage", lostDays: 0, manHoursAtTime: 483000 },
   ];
   const SEED_MH = [
-    { id: "seed_mh1", date: "2026-01-26", hours: 483000, personnel: 335, note: "Historical baseline" },
-    { id: "seed_mh2", date: "2026-06-03", hours: 3350, personnel: 335, note: "Daily entry" },
+    { id: "seed_mh1", date: "2026-06-03", hours: 787850, personnel: 335, note: "Cumulative total as of June 3, 2026 (483,000 baseline + ~91 working days × 3,350 hrs/day)" },
   ];
   const SEED_SPI = [
     { id: "seed_spi1", date: "2026-01-26", leading: 851, lagging: 60, spi: 92.95, notes: "Jan 26 final SPI" },
@@ -2169,8 +2168,13 @@ function SafetyMetrics() {
         ]);
         if (inc && inc.length) setIncidents(inc);
         else { await saveData(INCIDENTS_KEY, SEED_INCIDENTS); }
-        if (mh && mh.length) setManHoursLog(mh);
-        else { await saveData(MANHOURS_KEY, SEED_MH); }
+        // Always reseed manhours with corrected cumulative total
+        if (mh && mh.length && mh[0].id === "seed_mh1" && mh[0].hours === 787850) {
+          setManHoursLog(mh);
+        } else {
+          await saveData(MANHOURS_KEY, SEED_MH);
+          setManHoursLog(SEED_MH);
+        }
         if (spi && spi.length) setSpiLog(spi);
         else { await saveData(SPI_KEY, SEED_SPI); }
       } catch(e) {
