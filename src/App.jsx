@@ -61,7 +61,13 @@ const SUBCONTRACTORS = [
   "Other",
 ];
 
-const SEGMENTS = [
+// Segment county coordinates
+// S = Starr County (Rio Grande City area)
+// H = Hidalgo County (McAllen area)
+const SEGMENT_COORDS = {
+  S: { lat: 26.38, lon: -98.82, county: "Starr County" },
+  H: { lat: 26.20, lon: -98.23, county: "Hidalgo County" },
+};
   "S1","S2","S2A","S3","S3A","S3B","S4","S4A","S5","S5A",
   "S6","S6A","S7","S7A","S8","S8A","S9","S10","S10A",
   "S11","S12","S13","S13A","S14",
@@ -1087,6 +1093,36 @@ function InspectionForm({ onSubmit }) {
   const hiHighLevel = getHILevel(hiHigh);
   const hiLowLevel = getHILevel(hiLow);
 
+  const [weatherLoading, setWeatherLoading] = useState(false);
+
+  const fetchWeatherForSegment = async (segment) => {
+    if (!segment) return;
+    const county = segment.startsWith("H") ? SEGMENT_COORDS.H : SEGMENT_COORDS.S;
+    setWeatherLoading(true);
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&current=relative_humidity_2m,temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const humidity = Math.round(data.current.relative_humidity_2m);
+      const tempHigh = Math.round(data.daily.temperature_2m_max[0]);
+      const tempLow = Math.round(data.daily.temperature_2m_min[0]);
+      const wCode = data.current.weather_code;
+      // Map weather code to condition
+      const weatherCondition = wCode <= 1 ? "Clear / Sunny" :
+        wCode <= 3 ? "Partly Cloudy" :
+        wCode <= 49 ? "Overcast / Cloudy" :
+        wCode <= 67 ? "Rain / Thunderstorm" :
+        wCode <= 77 ? "Overcast / Cloudy" :
+        wCode <= 82 ? "Rain / Thunderstorm" :
+        wCode <= 99 ? "Rain / Thunderstorm" : "Clear / Sunny";
+      setForm(f => ({ ...f, humidity: String(humidity), tempHigh: String(tempHigh), tempLow: String(tempLow), weather: weatherCondition }));
+    } catch (e) {
+      console.error("Weather fetch failed:", e);
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
   const set = (field, val) => setForm((f) => ({ ...f, [field]: val }));
   const setItemStatus = (key, val) => setForm((f) => ({ ...f, itemStatus: { ...f.itemStatus, [key]: val } }));
   const setItemRemark = (key, val) => setForm((f) => ({ ...f, itemRemarks: { ...f.itemRemarks, [key]: val } }));
@@ -1167,10 +1203,11 @@ function InspectionForm({ onSubmit }) {
           </div>
           <div>
             <label style={labelStyle}>Segment / Location</label>
-            <select style={fieldStyle} value={form.projectArea} onChange={(e) => set("projectArea", e.target.value)}>
+            <select style={fieldStyle} value={form.projectArea} onChange={(e) => { set("projectArea", e.target.value); fetchWeatherForSegment(e.target.value); }}>
               <option value="">-- Select Segment --</option>
               {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+            {weatherLoading && <div style={{ fontSize: 11, color: "#64b5f6", marginTop: 4 }}>⏳ Fetching current weather...</div>}
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={labelStyle}>Subcontractors Present</label>
