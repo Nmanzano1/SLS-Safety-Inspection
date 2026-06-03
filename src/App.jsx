@@ -2209,10 +2209,21 @@ function SafetyMetrics({ inspections = [] }) {
   const BASELINE_INSPECTIONS = 505;
   const BASELINE_TALKS = 203;
   const BASELINE_TRAINING_HRS = 2060;
-  // Point weights verified against Jan 26: 851 leading, 60 lagging = 92.95% SPI
+
+  // Add 2 talks/week from Jan 26 to today for the period before the app was built
+  const JAN26 = new Date("2026-01-26");
+  const weeksElapsed = Math.floor((new Date() - JAN26) / (7 * 24 * 60 * 60 * 1000));
+  const talksFromJan26 = weeksElapsed * 2; // 2 talks/week
+  const trainingHrsFromJan26 = talksFromJan26 * 0.25 * 335; // 15 min × 335 workers
+
+  // App-submitted inspections each count as 1 toolbox talk (15 min)
+  const appTalks = inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length;
+  const appTrainingHrs = inspections.length * 0.25 * 335; // every inspection = 15 min safety briefing
+
   const totalInspections = BASELINE_INSPECTIONS + inspections.length;
-  const totalTalks = BASELINE_TALKS + inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length;
-  const totalTrainingHours = BASELINE_TRAINING_HRS + (inspections.filter(i => i.toolboxTopic && i.toolboxTopic.trim()).length * 0.25 * 335);
+  const totalTalks = BASELINE_TALKS + talksFromJan26 + appTalks;
+  const totalTrainingHours = BASELINE_TRAINING_HRS + trainingHrsFromJan26 + appTrainingHrs;
+
   const autoLeading = totalInspections + totalTalks + Math.round(totalTrainingHours / 14.4);
   const autoLagging = (ltiCount * 40) + (propDamageCount * 20) + (nearMissCount * 5);
   const autoSPI = autoLeading > 0 ? (((autoLeading - autoLagging) / autoLeading) * 100).toFixed(2) : "0.00";
@@ -2299,7 +2310,7 @@ function SafetyMetrics({ inspections = [] }) {
             <MetCard label="Total Man-Hours" value={totalManHours.toLocaleString()} sub="Cumulative" color="#4caf50" />
             <MetCard label="Days Without Lost-Time Accident" value={daysWithoutIncident} sub={lastLTI ? `Last LTI: ${lastLTI.date}` : "No LTIs recorded"} color="#4caf50" />
             <MetCard label="Current SPI (Auto)" value={`${autoSPI}%`} sub={`L:${autoLeading} / Lag:${autoLagging} · Updated live`} color={parseFloat(autoSPI) >= 90 ? "#4caf50" : parseFloat(autoSPI) >= 80 ? "#D4AF37" : "#f44336"} />
-            <MetCard label="Toolbox Talk Hours" value={`${totalTrainingHours.toFixed(0)}+`} sub={`${totalTalks} talks total · 15 min × 335 workers`} color="#4caf50" />
+            <MetCard label="Toolbox Talk Hours" value={Math.round(totalTrainingHours).toLocaleString()} sub={`${totalTalks} talks total · ${Math.round(appTrainingHrs)} hrs from app inspections`} color="#4caf50" />
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#f44336", textTransform: "uppercase", marginBottom: 10 }}>▼ Lagging</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
@@ -2431,7 +2442,7 @@ function SafetyMetrics({ inspections = [] }) {
                   <div style={{ fontSize: 22, fontWeight: 700, color: "#4caf50" }}>{autoLeading}</div>
                   <div style={{ fontSize: 10, color: "#555" }}>{totalInspections} inspections</div>
                   <div style={{ fontSize: 10, color: "#555" }}>{totalTalks} toolbox talks</div>
-                  <div style={{ fontSize: 10, color: "#555" }}>{totalTrainingHours.toFixed(0)} training hrs</div>
+                  <div style={{ fontSize: 10, color: "#555" }}>{Math.round(totalTrainingHours).toLocaleString()} training hrs</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 1 }}>Lagging</div>
