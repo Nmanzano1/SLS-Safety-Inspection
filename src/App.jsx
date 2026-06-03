@@ -68,6 +68,8 @@ const SEGMENT_COORDS = {
   S: { lat: 26.38, lon: -98.82, county: "Starr County" },
   H: { lat: 26.20, lon: -98.23, county: "Hidalgo County" },
 };
+
+const SEGMENTS = [
   "S1","S2","S2A","S3","S3A","S3B","S4","S4A","S5","S5A",
   "S6","S6A","S7","S7A","S8","S8A","S9","S10","S10A",
   "S11","S12","S13","S13A","S14",
