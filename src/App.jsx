@@ -1207,7 +1207,8 @@ function InspectionForm({ onSubmit }) {
     setWeatherLoading(true);
     setWeatherError("");
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&hourly=temperature_2m,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
+      // Use Vercel proxy to avoid CORS block on government networks
+      const url = `/api/weather?lat=${county.lat}&lon=${county.lon}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(url, { signal: controller.signal });
@@ -1236,8 +1237,7 @@ function InspectionForm({ onSubmit }) {
         setWeatherError("Weather unavailable — enter manually");
       }
     } catch (e) {
-      console.error("Weather fetch failed:", e.message);
-      setWeatherError("Weather unavailable — enter manually");
+      // Network blocked - fields left blank for manual entry
     } finally {
       setWeatherLoading(false);
     }
