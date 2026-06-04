@@ -1206,22 +1206,12 @@ function InspectionForm({ onSubmit }) {
     const county = segment.startsWith("H") ? SEGMENT_COORDS.H : SEGMENT_COORDS.S;
     setWeatherLoading(true);
     setWeatherError("");
-
-    // Smart seasonal defaults for South Texas (fallback if API fails)
-    const month = new Date().getMonth(); // 0-11
-    const defaults = {
-      weather: "Clear / Sunny",
-      humidity: month >= 5 && month <= 9 ? "65" : "55", // higher in summer
-      tempHigh: month >= 5 && month <= 8 ? "101" : month >= 9 && month <= 10 ? "88" : "75",
-      tempLow: month >= 5 && month <= 8 ? "78" : month >= 9 && month <= 10 ? "65" : "55",
-    };
-
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&current=relative_humidity_2m,temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`API ${res.status}`);
       const data = await res.json();
       const humidity = data.current?.relative_humidity_2m != null ? Math.round(data.current.relative_humidity_2m) : null;
@@ -1232,13 +1222,10 @@ function InspectionForm({ onSubmit }) {
       if (humidity && tempHigh && tempLow) {
         setForm(f => ({ ...f, humidity: String(humidity), tempHigh: String(tempHigh), tempLow: String(tempLow), weather: weatherCondition }));
       } else {
-        setForm(f => ({ ...f, ...defaults }));
-        setWeatherError("Partial data — defaults applied, verify before submitting");
+        setWeatherError("Weather unavailable — enter manually");
       }
     } catch (e) {
-      // API failed — use smart seasonal defaults so fields aren't blank
-      setForm(f => ({ ...f, ...defaults }));
-      setWeatherError("Live weather unavailable — seasonal defaults applied, verify before submitting");
+      setWeatherError("Weather unavailable — enter manually");
     } finally {
       setWeatherLoading(false);
     }
