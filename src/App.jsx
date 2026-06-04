@@ -1204,34 +1204,40 @@ function InspectionForm({ onSubmit }) {
     if (!segment) return;
     const county = segment.startsWith("H") ? SEGMENT_COORDS.H : SEGMENT_COORDS.S;
     setWeatherLoading(true);
+    setWeatherError("");
+
+    // Smart seasonal defaults for South Texas (fallback if API fails)
+    const month = new Date().getMonth(); // 0-11
+    const defaults = {
+      weather: "Clear / Sunny",
+      humidity: month >= 5 && month <= 9 ? "65" : "55", // higher in summer
+      tempHigh: month >= 5 && month <= 8 ? "101" : month >= 9 && month <= 10 ? "88" : "75",
+      tempLow: month >= 5 && month <= 8 ? "78" : month >= 9 && month <= 10 ? "65" : "55",
+    };
+
     try {
-      // Always fetch current conditions - historical dates not available via free API
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&current=relative_humidity_2m,temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
-      const res = await fetch(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`API ${res.status}`);
       const data = await res.json();
-      const humidity = data.current && data.current.relative_humidity_2m != null
-        ? Math.round(data.current.relative_humidity_2m) : "";
-      const tempHigh = data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max.length > 0
-        ? Math.round(data.daily.temperature_2m_max[0]) : "";
-      const tempLow = data.daily && data.daily.temperature_2m_min && data.daily.temperature_2m_min.length > 0
-        ? Math.round(data.daily.temperature_2m_min[0]) : "";
-      const wCode = data.current ? data.current.weather_code : 0;
-      const weatherCondition = wCode <= 1 ? "Clear / Sunny" :
-        wCode <= 3 ? "Partly Cloudy" :
-        wCode <= 49 ? "Overcast / Cloudy" :
-        wCode <= 67 ? "Rain / Thunderstorm" :
-        wCode <= 77 ? "Overcast / Cloudy" :
-        wCode <= 82 ? "Rain / Thunderstorm" :
-        wCode <= 99 ? "Rain / Thunderstorm" : "Clear / Sunny";
-      setForm(f => ({
-        ...f,
-        humidity: String(humidity),
-        tempHigh: String(tempHigh),
-        tempLow: String(tempLow),
-        weather: weatherCondition
-      }));
+      const humidity = data.current?.relative_humidity_2m != null ? Math.round(data.current.relative_humidity_2m) : null;
+      const tempHigh = data.daily?.temperature_2m_max?.[0] != null ? Math.round(data.daily.temperature_2m_max[0]) : null;
+      const tempLow = data.daily?.temperature_2m_min?.[0] != null ? Math.round(data.daily.temperature_2m_min[0]) : null;
+      const wCode = data.current?.weather_code ?? 0;
+      const weatherCondition = wCode <= 1 ? "Clear / Sunny" : wCode <= 3 ? "Partly Cloudy" : wCode <= 49 ? "Overcast / Cloudy" : "Rain / Thunderstorm";
+      if (humidity && tempHigh && tempLow) {
+        setForm(f => ({ ...f, humidity: String(humidity), tempHigh: String(tempHigh), tempLow: String(tempLow), weather: weatherCondition }));
+      } else {
+        setForm(f => ({ ...f, ...defaults }));
+        setWeatherError("Partial data — defaults applied, verify before submitting");
+      }
     } catch (e) {
-      console.error("Weather fetch failed:", e);
+      // API failed — use smart seasonal defaults so fields aren't blank
+      setForm(f => ({ ...f, ...defaults }));
+      setWeatherError("Live weather unavailable — seasonal defaults applied, verify before submitting");
     } finally {
       setWeatherLoading(false);
     }
@@ -1325,6 +1331,7 @@ function InspectionForm({ onSubmit }) {
               {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
             {weatherLoading && <div style={{ fontSize: 11, color: "#64b5f6", marginTop: 4 }}>⏳ Fetching current weather...</div>}
+            {weatherError && <div style={{ fontSize: 11, color: "#ff9800", marginTop: 4 }}>⚠️ {weatherError}</div>}
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={labelStyle}>Subcontractors Present</label>
