@@ -1166,12 +1166,12 @@ function InspectionForm({ onSubmit }) {
   };
 
   // NWS Heat Index formula (Rothfusz regression) — valid when temp ≥ 80°F and RH ≥ 40%
-  const calcHeatIndex = (t, rh) => {
+const calcHeatIndex = (t, rh) => {
     if (!t || !rh || t < 80) return null;
     const T = parseFloat(t);
     const R = parseFloat(rh);
     if (isNaN(T) || isNaN(R)) return null;
-    const HI =
+    let HI =
       -42.379 +
       2.04901523 * T +
       10.14333127 * R -
@@ -1181,6 +1181,12 @@ function InspectionForm({ onSubmit }) {
       0.00122874 * T * T * R +
       0.00085282 * T * R * R -
       0.00000199 * T * T * R * R;
+    if (R < 13 && T >= 80 && T <= 112) {
+      HI -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95)) / 17);
+    }
+    if (R > 85 && T >= 80 && T <= 87) {
+      HI += ((R - 85) / 10) * ((87 - T) / 5);
+    }
     return Math.round(HI);
   };
 
