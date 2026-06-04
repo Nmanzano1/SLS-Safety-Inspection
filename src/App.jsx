@@ -1199,6 +1199,7 @@ function InspectionForm({ onSubmit }) {
   const hiLowLevel = getHILevel(hiLow);
 
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState("");
 
   const fetchWeatherForSegment = async (segment) => {
     if (!segment) return;
