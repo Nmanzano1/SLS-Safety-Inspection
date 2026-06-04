@@ -1711,9 +1711,9 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 700, color: "#888", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Enforcement Action</label>
                         <select style={{ width: "100%", background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 6, color: "#e8e8e8", padding: "8px 10px", fontSize: 13, boxSizing: "border-box" }} value={editData.enforcementAction} onChange={(e) => setEditData((d) => ({ ...d, enforcementAction: e.target.value }))}>
-                          <option>Verbal Notice</option>
-                          <option>Written Notice</option>
-                          <option>Written Violation</option>
+                          <option>Immediate Correction / Coaching</option>
+                          <option>Verbal Warning</option>
+                          <option>Written Warning</option>
                           <option>Stop-Work Order</option>
                           <option>SLS to Correct</option>
                         </select>
