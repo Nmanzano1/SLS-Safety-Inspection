@@ -1,4 +1,0 @@
-{
-  "buildCommand": "react-scripts build",
-  "outputDirectory": "build"
-}
