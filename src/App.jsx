@@ -1205,10 +1205,10 @@ function InspectionForm({ onSubmit }) {
     const county = segment.startsWith("H") ? SEGMENT_COORDS.H : SEGMENT_COORDS.S;
     setWeatherLoading(true);
     try {
+      // Always fetch current conditions - historical dates not available via free API
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${county.lat}&longitude=${county.lon}&current=relative_humidity_2m,temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=1`;
       const res = await fetch(url);
       const data = await res.json();
-      console.log("Weather API response:", JSON.stringify(data));
       const humidity = data.current && data.current.relative_humidity_2m != null
         ? Math.round(data.current.relative_humidity_2m) : "";
       const tempHigh = data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max.length > 0
@@ -1223,7 +1223,6 @@ function InspectionForm({ onSubmit }) {
         wCode <= 77 ? "Overcast / Cloudy" :
         wCode <= 82 ? "Rain / Thunderstorm" :
         wCode <= 99 ? "Rain / Thunderstorm" : "Clear / Sunny";
-      console.log("Parsed:", { humidity, tempHigh, tempLow, weatherCondition });
       setForm(f => ({
         ...f,
         humidity: String(humidity),
@@ -1304,7 +1303,10 @@ function InspectionForm({ onSubmit }) {
           </div>
           <div>
             <label style={labelStyle}>Inspection Date *</label>
-            <input type="date" style={fieldStyle} value={form.date} onChange={(e) => set("date", e.target.value)} />
+            <input type="date" style={fieldStyle} value={form.date} onChange={(e) => {
+              set("date", e.target.value);
+              if (form.projectArea) fetchWeatherForSegment(form.projectArea);
+            }} />
           </div>
           <div>
             <label style={labelStyle}>Inspector *</label>
