@@ -1171,16 +1171,15 @@ const calcHeatIndex = (t, rh) => {
     const T = parseFloat(t);
     const R = parseFloat(rh);
     if (isNaN(T) || isNaN(R)) return null;
-    let HI =
-      -42.379 +
-      2.04901523 * T +
-      10.14333127 * R -
-      0.22475541 * T * R -
-      0.00683783 * T * T -
-      0.05481717 * R * R -
-      0.00122874 * T * T * R +
-      0.00085282 * T * R * R -
-      0.00000199 * T * T * R * R;
+    let HI = -42.379
+      + 2.04901523 * T
+      + 10.14333127 * R
+      - 0.22475541 * T * R
+      - 0.00683783 * T * T
+      - 0.05481717 * R * R
+      + 0.00122874 * T * T * R
+      + 0.00085282 * T * R * R
+      - 0.00000199 * T * T * R * R;
     if (R < 13 && T >= 80 && T <= 112) {
       HI -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95)) / 17);
     }
