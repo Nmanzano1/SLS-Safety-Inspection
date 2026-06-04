@@ -257,7 +257,7 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState("");
 
   const handleLogin = () => {
-    if (passwordInput === "Fishing") {
+    if (passwordInput === "Rg7#Lx2$Wq9!Nm4@") {
       localStorage.setItem("sls_auth", "true");
       setAuthenticated(true);
       setPasswordError(false);
