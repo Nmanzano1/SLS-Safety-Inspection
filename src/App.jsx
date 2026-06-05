@@ -1629,7 +1629,7 @@ function DeficiencyLog({ deficiencies, onUpdate, onDelete }) {
     setSelected(new Set());
   };
 
-  
+  const filtered = filter === "All" ? deficiencies : deficiencies.filter((d) => d.status === filter);
 
   const startEdit = (def) => {
     setEditingId(def.id);
