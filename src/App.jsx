@@ -363,6 +363,13 @@ export default function App() {
     await saveData(STORAGE_KEYS.DEFICIENCIES, updated);
     setDeficiencies(updated);
   }, [deficiencies]);
+  
+  const deleteDeficiencies = useCallback(async (ids) => {
+    const idSet = new Set(ids);
+    const updated = deficiencies.filter((d) => !idSet.has(d.id));
+    await saveData(STORAGE_KEYS.DEFICIENCIES, updated);
+    setDeficiencies(updated);
+  }, [deficiencies]);
 
   const deleteInspection = useCallback(async (id) => {
     if (!window.confirm("Delete this inspection? This cannot be undone.")) return;
@@ -453,7 +460,7 @@ export default function App() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px" }}>
         {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
-        {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} />}
+        {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} onDelete={deleteDeficiencies} />}
         {view === "metrics" && <SafetyMetrics inspections={inspections} />}
         {view === "reports" && <Reports inspections={inspections} deficiencies={deficiencies} />}
       </div>
@@ -1603,12 +1610,26 @@ const calcHeatIndex = (t, rh) => {
 }
 
 // ─── DEFICIENCY LOG ────────────────────────────────────────────────────────────
-function DeficiencyLog({ deficiencies, onUpdate }) {
+function DeficiencyLog({ deficiencies, onUpdate, onDelete }) {
   const [filter, setFilter] = useState("All");
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
+  const [selected, setSelected] = useState(new Set());
 
-  const filtered = filter === "All" ? deficiencies : deficiencies.filter((d) => d.status === filter);
+  const toggleSelect = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Permanently delete ${selected.size} deficiencie${selected.size > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    await onDelete([...selected]);
+    setSelected(new Set());
+  };
+
+  
 
   const startEdit = (def) => {
     setEditingId(def.id);
@@ -1639,7 +1660,7 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Deficiency Log</h1>
           <p style={{ color: "#666", fontSize: 13 }}>{deficiencies.length} total · {deficiencies.filter((d) => d.status === "Open").length} open</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {["All", "Open", "Closed"].map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={{
               background: filter === f ? "#1e3a5f" : "#111d2b", border: `1px solid ${filter === f ? "#D4AF37" : "#1e3a5f"}`,
@@ -1647,6 +1668,16 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
               color: filter === f ? "#D4AF37" : "#666",
             }}>{f}</button>
           ))}
+          {selected.size > 0 && (
+            <button onClick={handleBulkDelete} style={{ background: "#f44336", border: "none", borderRadius: 6, padding: "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#fff" }}>
+              🗑 Delete ({selected.size})
+            </button>
+          )}
+          {selected.size > 0 && (
+            <button onClick={() => setSelected(new Set())} style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 12, color: "#888" }}>
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -1680,6 +1711,11 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
                     {def.remarks && <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>"{def.remarks}"</div>}
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div
+                      onClick={() => toggleSelect(def.id)}
+                      style={{ width: 22, height: 22, borderRadius: 4, flexShrink: 0, cursor: "pointer", background: selected.has(def.id) ? "#3a1a1a" : "#0a1018", border: `2px solid ${selected.has(def.id) ? "#f44336" : "#1e3a5f"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#f44336", fontWeight: 900 }}>
+                      {selected.has(def.id) ? "✗" : ""}
+                    </div>
                     <span style={{ background: def.status === "Closed" ? "#1a3a1a" : "#2a1a0a", color: def.status === "Closed" ? "#4caf50" : "#ff9800", padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 700 }}>{def.status}</span>
                     <button onClick={() => isEditing ? saveEdit(def.id) : startEdit(def)} style={{ background: isEditing ? "#B8972A" : "#1e3a5f", border: "none", borderRadius: 6, padding: "6px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: isEditing ? "#0a1018" : "#D4AF37" }}>
                       {isEditing ? "Save" : "Edit"}
