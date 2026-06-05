@@ -1964,8 +1964,10 @@ const deleteTBT = async (id) => {
   topic: i.toolboxTopic, location: i.projectArea || "Field", conductor: i.inspector || "", source: "inspection", date: i.date
 }));
 const manualTalks = tbtLog.filter((t) => {
-  const d = new Date(t.date);
-  return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+  const parts = t.date.split("-");
+  const month = parseInt(parts[1]) - 1;
+  const year = parseInt(parts[0]);
+  return month === selectedMonth && year === selectedYear;
 });
 const allTalks = [...inspTalks, ...manualTalks];
 const toolboxTopics = allTalks.map(t => t.topic);
