@@ -257,8 +257,8 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState("");
 
   const handleLogin = () => {
-    if (passwordInput === "Rg7#Lx2$Wq9!Nm4@") {
-      localStorage.setItem("sls_auth", "true");
+  if (passwordInput === "Rg7#Lx2$Wq9!Nm4@") {
+    try { localStorage.setItem("sls_auth", "true"); } catch(e) {}
       setAuthenticated(true);
       setPasswordError(false);
     } else {
