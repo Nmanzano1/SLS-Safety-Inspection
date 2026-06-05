@@ -1793,6 +1793,36 @@ function DeficiencyLog({ deficiencies, onUpdate }) {
 function Reports({ inspections, deficiencies }) {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [tbtLog, setTbtLog] = useState([]);
+const [tbtForm, setTbtForm] = useState({ date: new Date().toISOString().split("T")[0], topic: "", location: "", attendees: "", conductor: "" });
+const [tbtSaving, setTbtSaving] = useState(false);
+
+useEffect(() => {
+  async function loadTBT() {
+    try {
+      const data = await loadData("sls_toolbox_talks");
+      setTbtLog(data || []);
+    } catch(e) {}
+  }
+  loadTBT();
+}, []);
+
+const addTBT = async () => {
+  if (!tbtForm.date || !tbtForm.topic) return;
+  setTbtSaving(true);
+  const entry = { id: genId(), date: tbtForm.date, topic: tbtForm.topic, location: tbtForm.location, attendees: parseInt(tbtForm.attendees) || 0, conductor: tbtForm.conductor, source: "manual" };
+  const updated = [entry, ...tbtLog];
+  await saveData("sls_toolbox_talks", updated);
+  setTbtLog(updated);
+  setTbtForm({ date: new Date().toISOString().split("T")[0], topic: "", location: "", attendees: "", conductor: "" });
+  setTbtSaving(false);
+};
+
+const deleteTBT = async (id) => {
+  const updated = tbtLog.filter(e => e.id !== id);
+  await saveData("sls_toolbox_talks", updated);
+  setTbtLog(updated);
+};
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   // Load metrics data from Firebase
@@ -1894,7 +1924,15 @@ function Reports({ inspections, deficiencies }) {
 
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-  const toolboxTopics = monthInsp.filter((i) => i.toolboxTopic).map((i) => i.toolboxTopic);
+  const inspTalks = monthInsp.filter((i) => i.toolboxTopic).map((i) => ({
+  topic: i.toolboxTopic, location: i.projectArea || "Field", conductor: i.inspector || "", source: "inspection", date: i.date
+}));
+const manualTalks = tbtLog.filter((t) => {
+  const d = new Date(t.date);
+  return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+});
+const allTalks = [...inspTalks, ...manualTalks];
+const toolboxTopics = allTalks.map(t => t.topic);
   const nearMisses = monthInsp.filter((i) => i.nearMisses && i.nearMisses.trim()).length;
   const remarkingCount = monthInsp.filter((i) => i.remarkingRequired).length;
   const utilityStrikes = monthInsp.filter((i) => i.utilityStrike);
@@ -1983,14 +2021,59 @@ function Reports({ inspections, deficiencies }) {
           </div>
 
           {/* TOOLBOX TALKS */}
-          {toolboxTopics.length > 0 && (
-            <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>Toolbox Talk Topics</div>
-              {toolboxTopics.map((t, i) => (
-                <div key={i} style={{ fontSize: 13, color: "#ccc", padding: "6px 0", borderBottom: "1px solid #1a2a3a" }}>• {t}</div>
-              ))}
-            </div>
-          )}
+          <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderTop: "3px solid #4caf50", borderRadius: 8, padding: 20 }}>
+  <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 6, letterSpacing: 1, textTransform: "uppercase" }}>Toolbox Talks</div>
+  <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>{allTalks.length} total this month — {inspTalks.length} from inspections · {manualTalks.length} manually logged</div>
+
+  <div style={{ background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+    <div style={{ fontSize: 11, fontWeight: 700, color: "#888", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Log Toolbox Talk</div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Date *</label>
+        <input type="date" style={{ width: "100%", background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 5, color: "#e8e8e8", padding: "7px 10px", fontSize: 12, boxSizing: "border-box" }} value={tbtForm.date} onChange={e => setTbtForm(f => ({...f, date: e.target.value}))} />
+      </div>
+      <div style={{ gridColumn: "span 2" }}>
+        <label style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Topic *</label>
+        <input type="text" style={{ width: "100%", background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 5, color: "#e8e8e8", padding: "7px 10px", fontSize: 12, boxSizing: "border-box" }} value={tbtForm.topic} onChange={e => setTbtForm(f => ({...f, topic: e.target.value}))} placeholder="e.g., Heat illness prevention, fall protection, PPE..." />
+      </div>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Location</label>
+        <input type="text" style={{ width: "100%", background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 5, color: "#e8e8e8", padding: "7px 10px", fontSize: 12, boxSizing: "border-box" }} value={tbtForm.location} onChange={e => setTbtForm(f => ({...f, location: e.target.value}))} placeholder="e.g., Office, S4, Mission Yard" />
+      </div>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Conductor</label>
+        <input type="text" style={{ width: "100%", background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 5, color: "#e8e8e8", padding: "7px 10px", fontSize: 12, boxSizing: "border-box" }} value={tbtForm.conductor} onChange={e => setTbtForm(f => ({...f, conductor: e.target.value}))} placeholder="Name / title" />
+      </div>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Attendees</label>
+        <input type="number" style={{ width: "100%", background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 5, color: "#e8e8e8", padding: "7px 10px", fontSize: 12, boxSizing: "border-box" }} value={tbtForm.attendees} onChange={e => setTbtForm(f => ({...f, attendees: e.target.value}))} placeholder="# of workers" />
+      </div>
+    </div>
+    <button onClick={addTBT} disabled={tbtSaving} style={{ marginTop: 12, background: "linear-gradient(135deg,#B8972A,#D4AF37)", border: "none", borderRadius: 6, padding: "9px 22px", fontWeight: 800, fontSize: 12, color: "#0a1018", cursor: "pointer" }}>
+      {tbtSaving ? "Saving..." : "+ Log Talk"}
+    </button>
+  </div>
+
+  {allTalks.length === 0 ? (
+    <div style={{ color: "#555", fontSize: 13 }}>No toolbox talks this month</div>
+  ) : (
+    [...allTalks].sort((a, b) => new Date(b.date) - new Date(a.date)).map((t, i) => (
+      <div key={t.id || i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #1a2a3a" }}>
+        <span style={{ fontSize: 11, color: "#555", minWidth: 80 }}>{t.date}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: t.source === "manual" ? "#1a1500" : "#0a1a2a", color: t.source === "manual" ? "#D4AF37" : "#64b5f6" }}>
+          {t.source === "manual" ? "Manual" : "Inspection"}
+        </span>
+        <span style={{ fontSize: 13, color: "#ccc", flex: 1 }}>{t.topic}</span>
+        {t.location && <span style={{ fontSize: 11, color: "#666" }}>📍 {t.location}</span>}
+        {t.conductor && <span style={{ fontSize: 11, color: "#888" }}>by {t.conductor}</span>}
+        {t.attendees > 0 && <span style={{ fontSize: 11, color: "#4caf50" }}>{t.attendees} workers</span>}
+        {t.source === "manual" && (
+          <button onClick={() => deleteTBT(t.id)} style={{ background: "#3a1a1a", border: "none", borderRadius: 4, padding: "2px 7px", color: "#f44336", fontSize: 11, cursor: "pointer" }}>✕</button>
+        )}
+      </div>
+    ))
+  )}
+</div>
 
           {/* DEFICIENCY BY SUBCONTRACTOR */}
           {monthDefs.length > 0 && (() => {
