@@ -245,9 +245,9 @@ function genId() {
 
 // ─── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(() => {
-    return localStorage.getItem("sls_auth") === "true";
-  });
+ const [authenticated, setAuthenticated] = useState(() => {
+  try { return localStorage.getItem("sls_auth") === "true"; } catch(e) { return false; }
+});
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
   const [view, setView] = useState("dashboard");
