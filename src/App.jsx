@@ -311,7 +311,7 @@ loadInspections(),
     async function init() {
       try {
         const [insp, defs] = await Promise.all([
-          loadData(STORAGE_KEYS.INSPECTIONS),
+          loadInspections(),
           loadData(STORAGE_KEYS.DEFICIENCIES),
         ]);
         setInspections(insp);
@@ -376,7 +376,7 @@ loadInspections(),
     const updatedDefs = [...newDefs, ...deficiencies];
 
     await deleteInspectionDoc(id);
-    const ok1 = await saveData(STORAGE_KEYS.INSPECTIONS, updatedInspections);
+    const ok1 = await saveInspection(newInspection);
     const ok2 = await saveData(STORAGE_KEYS.DEFICIENCIES, updatedDefs);
 
     if (ok1 && ok2) {
@@ -407,7 +407,7 @@ loadInspections(),
     if (!window.confirm("Delete this inspection? This cannot be undone.")) return;
     const updatedInspections = inspections.filter((i) => i.id !== id);
     const updatedDefs = deficiencies.filter((d) => d.inspectionId !== id);
-    await saveData(STORAGE_KEYS.INSPECTIONS, updatedInspections);
+    await deleteInspectionDoc(id);
     await saveData(STORAGE_KEYS.DEFICIENCIES, updatedDefs);
     setInspections(updatedInspections);
     setDeficiencies(updatedDefs);
@@ -490,7 +490,16 @@ loadInspections(),
 
       {/* VIEWS */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px" }}>
-        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} />}
+        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} onImport={async (imported) => {
+  setSaveStatus("saving");
+  let saved = 0;
+  for (const insp of imported) {
+    const ok = await saveInspection(insp);
+    if (ok) { saved++; setInspections(prev => [insp, ...prev.filter(i => i.id !== insp.id)]); }
+  }
+  setSaveStatus("saved");
+  setTimeout(() => setSaveStatus(""), 3000);
+}} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
         {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} onDelete={deleteDeficiencies} />}
         {view === "metrics" && <SafetyMetrics inspections={inspections} />}
@@ -826,9 +835,132 @@ async function generateInspectionPDF(inspection, deficiencies) {
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({ inspections, deficiencies, onDelete }) {
+function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
   const now = new Date();
-  const thisMonth = inspections.filter((i) => {
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState(null);
+
+  const KNOWN_SUBS = ["Ultimate Concrete, LLC", "S&K Design Build", "Strong Steel", "P&C Utility Locators", "H&S Construction", "Fuqua Construction"];
+
+  const parsePDFText = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const insp = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      submittedAt: new Date().toISOString(),
+      date: "", inspectionType: "Daily Safety Inspection", inspector: "",
+      projectArea: "", contractNumber: "70B01C23F00001236", weather: "",
+      tempHigh: "", tempLow: "", humidity: "", subcontractors: [],
+      ahaSignedIn: false, toolboxTopic: "", generalObservations: "",
+      nearMisses: "", additionalNotes: "", remarkingRequired: false,
+      utilityStrike: false, utilityStrikeType: "Known Utility",
+      utilityStrikeDetails: "", itemStatus: {}, itemRemarks: {},
+    };
+    for (const line of lines) {
+      const m1 = line.match(/Date\s+(\d{4}-\d{2}-\d{2})/);
+      if (m1) { insp.date = m1[1]; insp.submittedAt = m1[1] + "T12:00:00.000Z"; }
+      const m2 = line.match(/Inspector\s+(.+)/);
+      if (m2) insp.inspector = m2[1].trim();
+      if (line.includes("Periodic Safety Inspection")) insp.inspectionType = "Periodic Safety Inspection";
+      const m3 = line.match(/Project Area\s+(\S+)/);
+      if (m3) insp.projectArea = m3[1];
+      const m4 = line.match(/Weather\s+(.+)/);
+      if (m4) insp.weather = m4[1].trim();
+      const m5 = line.match(/Temp High \/ Low\s+(\d+)F\s*\/\s*(\d+)F/);
+      if (m5) { insp.tempHigh = m5[1]; insp.tempLow = m5[2]; }
+      const m6 = line.match(/Humidity\s+(\d+)%/);
+      if (m6) insp.humidity = m6[1];
+      if (line.match(/AHA Sign-In Verified/) && line.includes("YES")) insp.ahaSignedIn = true;
+      const m7 = line.match(/Toolbox Talk\s+(.+)/);
+      if (m7 && m7[1].trim().toLowerCase() !== "none") insp.toolboxTopic = m7[1].trim();
+      if (line.match(/Subcontractors\s+/)) {
+        const m8 = line.match(/Subcontractors\s+(.+?)(?:Temp High|$)/);
+        if (m8) {
+          let rem = m8[1].trim();
+          const subs = [];
+          for (const ks of KNOWN_SUBS) {
+            if (rem.includes(ks)) { subs.push(ks); rem = rem.replace(ks, "").replace(/^[\s,]+/, ""); }
+          }
+          for (const s of rem.split(",")) { const t = s.trim(); if (t && !subs.includes(t)) subs.push(t); }
+          insp.subcontractors = subs.filter(Boolean);
+        }
+      }
+    }
+    let currentSection = null;
+    const SECTIONS = INSPECTION_SECTIONS;
+    for (const line of lines) {
+      for (const sec of SECTIONS) {
+        if (line.toLowerCase().includes(sec.label.toLowerCase()) && line.length < sec.label.length + 15) {
+          currentSection = sec; break;
+        }
+      }
+      if (!currentSection) continue;
+      if (line.startsWith("DEFICIENCIES") || line.startsWith("CERTIFICATION")) { currentSection = null; continue; }
+      let status = null, remark = "", itemText = line;
+      for (const s of ["DEFICIENCY", "PASS", "N/A"]) {
+        if (line.includes(s)) {
+          const idx = line.indexOf(s);
+          itemText = line.slice(0, idx).trim();
+          remark = line.slice(idx + s.length).trim();
+          status = s; break;
+        }
+      }
+      if (!status) continue;
+      const normLine = itemText.toLowerCase().replace(/[^\w\s]/g, ' ');
+      let bestIdx = -1, bestScore = 0;
+      for (let i = 0; i < currentSection.items.length; i++) {
+        const normItem = currentSection.items[i].toLowerCase().replace(/[^\w\s]/g, ' ');
+        const lineWords = new Set(normLine.split(/\s+/).filter(w => w.length > 3));
+        const itemWords = new Set(normItem.split(/\s+/).filter(w => w.length > 3));
+        let overlap = 0;
+        for (const w of lineWords) { if (itemWords.has(w)) overlap++; }
+        const score = itemWords.size > 0 ? overlap / itemWords.size : 0;
+        if (score > bestScore && score > 0.3) { bestScore = score; bestIdx = i; }
+      }
+      if (bestIdx >= 0) {
+        const key = `${currentSection.id}_${bestIdx}`;
+        insp.itemStatus[key] = status === "PASS" ? "✓ Satisfactory" : status === "DEFICIENCY" ? "✗ Deficiency" : "N/A";
+        if (remark) insp.itemRemarks[key] = remark;
+      }
+    }
+    return insp;
+  };
+
+  const handlePDFImport = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setImporting(true);
+    setImportResults(null);
+    const results = { success: [], failed: [] };
+    for (const file of files) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+        const str = new TextDecoder('latin1').decode(uint8);
+        const textParts = [];
+        const btEtRegex = /BT([\s\S]*?)ET/g;
+        let match;
+        while ((match = btEtRegex.exec(str)) !== null) {
+          const block = match[1];
+          const strRegex = /\(([^)]*)\)\s*Tj|\[((?:[^[\]]*|\[[^\]]*\])*)\]\s*TJ/g;
+          let m2;
+          while ((m2 = strRegex.exec(block)) !== null) {
+            if (m2[1] !== undefined) textParts.push(m2[1]);
+            else if (m2[2]) {
+              const parts2 = m2[2].match(/\(([^)]*)\)/g) || [];
+              parts2.forEach(p => textParts.push(p.slice(1,-1)));
+            }
+          }
+          textParts.push('\n');
+        }
+        const text = textParts.join(' ').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
+        const insp = parsePDFText(text);
+        if (insp.date) {
+          results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
+        } else {
+          results.failed.push({ file: file.name, reason: "Could not extract date" });
+        }
+      } catch(err) {
+        results.failed.push({ file:
     const d = new Date(i.submittedAt);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
@@ -905,9 +1037,33 @@ function Dashboard({ inspections, deficiencies, onDelete }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Safety Dashboard</h1>
-        <p style={{ color: "#666", fontSize: 13 }}>Contract #70B01C23F00001236 · RGV Barriers & Attributes</p>
+      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Safety Dashboard</h1>
+          <p style={{ color: "#666", fontSize: 13 }}>Contract #70B01C23F00001236 · RGV Barriers & Attributes</p>
+        </div>
+        <div>
+          <label style={{ background: "#1e3a5f", border: "1px solid #D4AF37", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#D4AF37", display: "inline-block" }}>
+            {importing ? "⏳ Importing..." : "📥 Import PDFs"}
+            <input type="file" accept=".pdf" multiple onChange={handlePDFImport} style={{ display: "none" }} disabled={importing} />
+          </label>
+          {importResults && (
+            <div style={{ marginTop: 10, background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 8, padding: 14, minWidth: 280 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#4caf50", marginBottom: 8 }}>✓ {importResults.success.length} imported successfully</div>
+              {importResults.success.map((r, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>→ {r.date} · {r.inspector?.split(' ')[0]} · {r.file}</div>
+              ))}
+              {importResults.failed.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f44336", marginBottom: 6 }}>✗ {importResults.failed.length} failed</div>
+                  {importResults.failed.map((r, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#888" }}>→ {r.file}: {r.reason}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {inspections.length === 0 ? (
