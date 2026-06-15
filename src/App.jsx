@@ -284,6 +284,9 @@ export default function App() {
   const [deficiencies, setDeficiencies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [view, setView] = useState("dashboard");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
 
   const handleLogin = () => {
   if (passwordInput === "Rg7#Lx2$Wq9!Nm4@") {
@@ -955,7 +958,18 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
           results.failed.push({ file: file.name, reason: "Could not extract date" });
         }
       } catch(err) {
-        results.failed.push({ file:
+        results.failed.push({ file: file.name, reason: err.message });
+      }
+    }
+    if (results.success.length > 0) {
+      await onImport(results.success.map(r => r.insp));
+    }
+    setImportResults(results);
+    setImporting(false);
+    e.target.value = "";
+  };
+
+  const thisMonth = inspections.filter((i) => {
     const d = new Date(i.submittedAt);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
