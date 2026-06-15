@@ -951,10 +951,25 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
         const insp = parsePDFText(text);
         // Fallback: extract date from filename e.g. SLS_Inspection_20260602_Nicholas.pdf
         if (!insp.date) {
+          // Try 8-digit: SLS_Inspection_20260602_Nicholas.pdf
           const fnMatch = file.name.match(/(\d{4})(\d{2})(\d{2})/);
           if (fnMatch) {
             insp.date = `${fnMatch[1]}-${fnMatch[2]}-${fnMatch[3]}`;
             insp.submittedAt = insp.date + "T12:00:00.000Z";
+          } else {
+            // Try M-D-YYYY: Nathan Salinas Safety Inspection 6-08-2026.pdf
+            const fn4 = file.name.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+            if (fn4) {
+              insp.date = `${fn4[3]}-${fn4[1].padStart(2,"0")}-${fn4[2].padStart(2,"0")}`;
+              insp.submittedAt = insp.date + "T12:00:00.000Z";
+            } else {
+              // Try M-D-YY: Nathan Salinas Safety Inspection 6-10-26.pdf
+              const fn2 = file.name.match(/(\d{1,2})-(\d{1,2})-(\d{2})(?!\d)/);
+              if (fn2) {
+                insp.date = `20${fn2[3]}-${fn2[1].padStart(2,"0")}-${fn2[2].padStart(2,"0")}`;
+                insp.submittedAt = insp.date + "T12:00:00.000Z";
+              }
+            }
           }
         }
         if (insp.date) {
