@@ -949,6 +949,14 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
         if (run.length > 3) textParts.push(run);
         const text = textParts.join(' ');
         const insp = parsePDFText(text);
+        // Fallback: extract date from filename e.g. SLS_Inspection_20260602_Nicholas.pdf
+        if (!insp.date) {
+          const fnMatch = file.name.match(/(\d{4})(\d{2})(\d{2})/);
+          if (fnMatch) {
+            insp.date = `${fnMatch[1]}-${fnMatch[2]}-${fnMatch[3]}`;
+            insp.submittedAt = insp.date + "T12:00:00.000Z";
+          }
+        }
         if (insp.date) {
           results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
         } else {
