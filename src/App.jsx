@@ -1302,10 +1302,8 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
                           <button
                             onClick={() => {
   if (ins.originalPDF) {
-    const a = document.createElement("a");
-    a.href = ins.originalPDF;
-    a.download = `SLS_Inspection_${ins.date}.pdf`;
-    a.click();
+    const w = window.open();
+    w.document.write(`<iframe src="${ins.originalPDF}" style="width:100%;height:100vh;border:none;"></iframe>`);
   } else {
     generateInspectionPDF(ins, deficiencies);
   }
