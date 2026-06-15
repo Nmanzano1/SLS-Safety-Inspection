@@ -279,10 +279,7 @@ function genId() {
 export default function App() {
  const [authenticated, setAuthenticated] = useState(() => {
   try { return localStorage.getItem("sls_auth") === "true"; } catch(e) { return false; }
-loadInspections(),
-          loadData(STORAGE_KEYS.DEFICIENCIES),
-        ]);
-        setInspections(insp.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)));
+  });
   const [inspections, setInspections] = useState([]);
   const [deficiencies, setDeficiencies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -344,7 +341,6 @@ loadInspections(),
           newDefs.push({
             id: genId(),
             inspectionId: newInspection.id,
-            const ok1 = await saveInspection(newInspection);
             inspector: formData.inspector,
             segment: formData.projectArea || "",
             subcontractors: formData.subcontractors || [],
@@ -375,7 +371,6 @@ loadInspections(),
     newDefs.forEach((d) => { if (priorItemKeys.has(d.itemKey)) d.isRepeat = true; });
     const updatedDefs = [...newDefs, ...deficiencies];
 
-    await deleteInspectionDoc(id);
     const ok1 = await saveInspection(newInspection);
     const ok2 = await saveData(STORAGE_KEYS.DEFICIENCIES, updatedDefs);
 
