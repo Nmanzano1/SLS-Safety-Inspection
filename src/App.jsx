@@ -982,18 +982,11 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
         // Store original PDF as base64
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
         insp.originalPDF = `data:application/pdf;base64,${base64}`;
-
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        insp.originalPDF = `data:application/pdf;base64,${base64}`;
-
         if (insp.date) {
           results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
         } else {
           results.failed.push({ file: file.name, reason: "Could not extract date" });
         }
-      } catch(err) {
-        results.failed.push({ file: file.name, reason: err.message });
-      }
     }
     if (results.success.length > 0) {
       await onImport(results.success.map(r => r.insp));
