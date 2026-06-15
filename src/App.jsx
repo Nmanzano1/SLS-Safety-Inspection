@@ -490,16 +490,7 @@ loadInspections(),
 
       {/* VIEWS */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px" }}>
-        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} onImport={async (imported) => {
-  setSaveStatus("saving");
-  let saved = 0;
-  for (const insp of imported) {
-    const ok = await saveInspection(insp);
-    if (ok) { saved++; setInspections(prev => [insp, ...prev.filter(i => i.id !== insp.id)]); }
-  }
-  setSaveStatus("saved");
-  setTimeout(() => setSaveStatus(""), 3000);
-}} />}
+        {view === "dashboard" && <Dashboard inspections={inspections} deficiencies={deficiencies} onDelete={deleteInspection} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
         {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} onDelete={deleteDeficiencies} />}
         {view === "metrics" && <SafetyMetrics inspections={inspections} />}
@@ -835,210 +826,8 @@ async function generateInspectionPDF(inspection, deficiencies) {
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
+function Dashboard({ inspections, deficiencies, onDelete }) {
   const now = new Date();
-  const [importing, setImporting] = useState(false);
-  const [importResults, setImportResults] = useState(null);
-
-  const KNOWN_SUBS = ["Ultimate Concrete, LLC", "S&K Design Build", "Strong Steel", "P&C Utility Locators", "H&S Construction", "Fuqua Construction"];
-
-  const parsePDFText = (text) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const insp = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      submittedAt: new Date().toISOString(),
-      date: "", inspectionType: "Daily Safety Inspection", inspector: "",
-      projectArea: "", contractNumber: "70B01C23F00001236", weather: "",
-      tempHigh: "", tempLow: "", humidity: "", subcontractors: [],
-      ahaSignedIn: false, toolboxTopic: "", generalObservations: "",
-      nearMisses: "", additionalNotes: "", remarkingRequired: false,
-      utilityStrike: false, utilityStrikeType: "Known Utility",
-      utilityStrikeDetails: "", itemStatus: {}, itemRemarks: {},
-    };
-
-    for (const line of lines) {
-      const m1 = line.match(/Date\s+(\d{4}-\d{2}-\d{2})/);
-      if (m1) { insp.date = m1[1]; insp.submittedAt = m1[1] + "T12:00:00.000Z"; }
-      const m2 = line.match(/Inspector\s+(.+)/);
-      if (m2) insp.inspector = m2[1].trim();
-      if (line.includes("Periodic Safety Inspection")) insp.inspectionType = "Periodic Safety Inspection";
-      const m3 = line.match(/Project Area\s+(\S+)/);
-      if (m3) insp.projectArea = m3[1];
-      const m4 = line.match(/Weather\s+(.+)/);
-      if (m4) insp.weather = m4[1].trim();
-      const m5 = line.match(/Temp High \/ Low\s+(\d+)F\s*\/\s*(\d+)F/);
-      if (m5) { insp.tempHigh = m5[1]; insp.tempLow = m5[2]; }
-      const m6 = line.match(/Humidity\s+(\d+)%/);
-      if (m6) insp.humidity = m6[1];
-      if (line.match(/AHA Sign-In Verified/) && line.includes("YES")) insp.ahaSignedIn = true;
-      const m7 = line.match(/Toolbox Talk\s+(.+)/);
-      if (m7 && m7[1].trim().toLowerCase() !== "none") insp.toolboxTopic = m7[1].trim();
-      if (line.match(/Subcontractors\s+/)) {
-        const m8 = line.match(/Subcontractors\s+(.+?)(?:Temp High|$)/);
-        if (m8) {
-          let rem = m8[1].trim();
-          const subs = [];
-          for (const ks of KNOWN_SUBS) {
-            if (rem.includes(ks)) { subs.push(ks); rem = rem.replace(ks, "").replace(/^[\s,]+/, ""); }
-          }
-          for (const s of rem.split(",")) { const t = s.trim(); if (t && !subs.includes(t)) subs.push(t); }
-          insp.subcontractors = subs.filter(Boolean);
-        }
-      }
-    }
-
-    // Parse inspection items
-    const SECTIONS = [
-      { id:"admin", label:"General Site & Administrative", items:[
-        "Emergency contact numbers posted on site","Emergency muster point sign posted","First aid kit stocked",
-        "SDS / HazCom binder","Activity Hazard Analyses (AHAs)","Competent Person identified",
-        "Personnel have valid site badges","No unauthorized personnel","Heat illness prevention plan",
-        "Subcontractor supervisor has documented cool down break schedule","Adequate potable water",
-      ]},
-      { id:"ppe", label:"PPE & General Safety", items:[
-        "Hard hats worn","All personnel wearing safety glasses","Face shields used when required",
-        "Hi-vis vest","Safety footwear (steel-toed)","Appropriate gloves worn for task",
-        "Hearing protection","Dust masks used","All PPE in serviceable condition",
-      ]},
-      { id:"fall", label:"Elevated Work", items:[
-        "Fall protection in use at 6 ft","Personal fall arrest systems properly donned","Harnesses inspected",
-        "Lanyards / SRL inspected","Hole covers in place","Leading edges protected",
-        "All workers using fall protection have documented training","MEWP/aerial lift operator is authorized",
-        "Ladders in good condition","Ladders secured at top","Correct ladder angle maintained","Three points of contact",
-      ]},
-      { id:"excavation", label:"Excavation & Trenching", items:[
-        "Competent Person has visually and manually inspected excavation","Excavations >5 ft protected",
-        "Spoil piles","Safe egress within 25 ft","No water accumulation in excavations",
-        "Open excavations protected","Concrete trucks and heavy equipment staying",
-      ]},
-      { id:"equipment", label:"Equipment Operations", items:[
-        "I have verified with a minimum of 3 equipment operators","Operators have valid certifications",
-        "Backup / reverse alarms functional","Seat belts in use","Drip pans in place",
-        "All POVs and equipment parked","Equipment operators not traveling with a load",
-        "Equipment travel paths clear","No equipment left running and unattended",
-      ]},
-      { id:"rigging", label:"Rigging & Lifting", items:[
-        "Qualified Rigger designated","All slings, shackles, hooks","SWL / WLL ratings visible",
-        "Tag lines in use","Lift plans approved","No personnel standing directly underneath MEWP",
-        "No personnel under suspended load","All tools tethered when working at height",
-      ]},
-      { id:"electrical", label:"Electrical", items:[
-        "GFCI protection","Extension cords in good condition","Electrical panels labeled",
-        "LOTO procedures active","Locks and tags applied by authorized employees",
-      ]},
-      { id:"hotwork", label:"Hot Work", items:[
-        "Hot work permit issued","Area surveyed and clear of combustible materials",
-        "Fire extinguisher","Fire watch assigned","Fire watch maintained for",
-      ]},
-      { id:"housekeeping", label:"Housekeeping", items:[
-        "Work area housekeeping acceptable","Materials stored safely","Concrete rubble piles",
-        "Walking / working surfaces clear","Emergency access routes","Sanitation / portable toilet",
-      ]},
-      { id:"traffic", label:"Traffic Control", items:[
-        "All required traffic control signs","Flaggers certified","Staged material protected from vehicles",
-      ]},
-      { id:"environmental", label:"Environmental", items:[
-        "Spill kit available","Concrete washout pits not overflowing","SWPPP BMPs",
-        "Concrete washout contained","Noise and dust controls",
-      ]},
-      { id:"utility", label:"Utility Locates", items:[
-        "811 one-call notification","Utilities potholed","utility rep / owner representative",
-        "utility markings in the field maintained","2-foot buffer by hand digging",
-      ]},
-    ];
-
-    let currentSection = null;
-    for (const line of lines) {
-      for (const sec of SECTIONS) {
-        if (line.toLowerCase().includes(sec.label.toLowerCase()) && line.length < sec.label.length + 15) {
-          currentSection = sec; break;
-        }
-      }
-      if (!currentSection) continue;
-      if (line === "Inspection Item Status Remarks" || line === "Inspection Item") continue;
-      if (line.startsWith("DEFICIENCIES") || line.startsWith("CERTIFICATION")) { currentSection = null; continue; }
-
-      let status = null, remark = "", itemText = line;
-      for (const s of ["DEFICIENCY", "PASS", "N/A"]) {
-        if (line.includes(s)) {
-          const idx = line.indexOf(s);
-          itemText = line.slice(0, idx).trim();
-          remark = line.slice(idx + s.length).trim();
-          status = s; break;
-        }
-      }
-      if (!status) continue;
-
-      const normLine = itemText.toLowerCase().replace(/[^\w\s]/g, ' ');
-      let bestIdx = -1, bestScore = 0;
-      for (let i = 0; i < currentSection.items.length; i++) {
-        const normItem = currentSection.items[i].toLowerCase().replace(/[^\w\s]/g, ' ');
-        const lineWords = new Set(normLine.split(/\s+/).filter(w => w.length > 3));
-        const itemWords = new Set(normItem.split(/\s+/).filter(w => w.length > 3));
-        let overlap = 0;
-        for (const w of lineWords) { if (itemWords.has(w)) overlap++; }
-        const score = itemWords.size > 0 ? overlap / itemWords.size : 0;
-        if (score > bestScore && score > 0.3) { bestScore = score; bestIdx = i; }
-      }
-      if (bestIdx >= 0) {
-        const key = `${currentSection.id}_${bestIdx}`;
-        insp.itemStatus[key] = status === "PASS" ? "✓ Satisfactory" : status === "DEFICIENCY" ? "✗ Deficiency" : "N/A";
-        if (remark) insp.itemRemarks[key] = remark;
-      }
-    }
-    return insp;
-  };
-
-  const handlePDFImport = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setImporting(true);
-    setImportResults(null);
-    const results = { success: [], failed: [] };
-
-    for (const file of files) {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8 = new Uint8Array(arrayBuffer);
-        // Extract text using basic PDF text stream parsing
-        const str = new TextDecoder('latin1').decode(uint8);
-        // Extract text between BT and ET markers (PDF text objects)
-        const textParts = [];
-        const btEtRegex = /BT([\s\S]*?)ET/g;
-        let match;
-        while ((match = btEtRegex.exec(str)) !== null) {
-          const block = match[1];
-          // Extract strings in parentheses (Tj/TJ operators)
-          const strRegex = /\(([^)]*)\)\s*Tj|\[((?:[^[\]]*|\[[^\]]*\])*)\]\s*TJ/g;
-          let m2;
-          while ((m2 = strRegex.exec(block)) !== null) {
-            if (m2[1] !== undefined) textParts.push(m2[1]);
-            else if (m2[2]) {
-              const parts2 = m2[2].match(/\(([^)]*)\)/g) || [];
-              parts2.forEach(p => textParts.push(p.slice(1,-1)));
-            }
-          }
-          textParts.push('\n');
-        }
-        const text = textParts.join(' ').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
-        const insp = parsePDFText(text);
-        if (insp.date) {
-          results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
-        } else {
-          results.failed.push({ file: file.name, reason: "Could not extract date" });
-        }
-      } catch(err) {
-        results.failed.push({ file: file.name, reason: err.message });
-      }
-    }
-
-    if (results.success.length > 0) {
-      await onImport(results.success.map(r => r.insp));
-    }
-    setImportResults(results);
-    setImporting(false);
-    e.target.value = "";
-  };
   const thisMonth = inspections.filter((i) => {
     const d = new Date(i.submittedAt);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -1116,33 +905,9 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Safety Dashboard</h1>
-          <p style={{ color: "#666", fontSize: 13 }}>Contract #70B01C23F00001236 · RGV Barriers & Attributes</p>
-        </div>
-        <div>
-          <label style={{ background: "#1e3a5f", border: "1px solid #D4AF37", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#D4AF37", display: "inline-block" }}>
-            {importing ? "⏳ Importing..." : "📥 Import PDFs"}
-            <input type="file" accept=".pdf" multiple onChange={handlePDFImport} style={{ display: "none" }} disabled={importing} />
-          </label>
-          {importResults && (
-            <div style={{ marginTop: 10, background: "#0a1018", border: "1px solid #1e3a5f", borderRadius: 8, padding: 14, minWidth: 280 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#4caf50", marginBottom: 8 }}>✓ {importResults.success.length} imported successfully</div>
-              {importResults.success.map((r, i) => (
-                <div key={i} style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>→ {r.date} · {r.inspector?.split(' ')[0]} · {r.file}</div>
-              ))}
-              {importResults.failed.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f44336", marginBottom: 6 }}>✗ {importResults.failed.length} failed</div>
-                  {importResults.failed.map((r, i) => (
-                    <div key={i} style={{ fontSize: 11, color: "#888" }}>→ {r.file}: {r.reason}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Safety Dashboard</h1>
+        <p style={{ color: "#666", fontSize: 13 }}>Contract #70B01C23F00001236 · RGV Barriers & Attributes</p>
       </div>
 
       {inspections.length === 0 ? (
