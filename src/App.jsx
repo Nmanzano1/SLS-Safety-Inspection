@@ -934,23 +934,20 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
         const arrayBuffer = await file.arrayBuffer();
         const uint8 = new Uint8Array(arrayBuffer);
         const str = new TextDecoder('latin1').decode(uint8);
+        // Extract all readable ASCII text runs from the PDF binary
         const textParts = [];
-        const btEtRegex = /BT([\s\S]*?)ET/g;
-        let match;
-        while ((match = btEtRegex.exec(str)) !== null) {
-          const block = match[1];
-          const strRegex = /\(([^)]*)\)\s*Tj|\[((?:[^[\]]*|\[[^\]]*\])*)\]\s*TJ/g;
-          let m2;
-          while ((m2 = strRegex.exec(block)) !== null) {
-            if (m2[1] !== undefined) textParts.push(m2[1]);
-            else if (m2[2]) {
-              const parts2 = m2[2].match(/\(([^)]*)\)/g) || [];
-              parts2.forEach(p => textParts.push(p.slice(1,-1)));
-            }
+        let run = '';
+        for (let i = 0; i < str.length; i++) {
+          const c = str.charCodeAt(i);
+          if (c >= 32 && c <= 126) {
+            run += str[i];
+          } else {
+            if (run.length > 3) textParts.push(run);
+            run = '';
           }
-          textParts.push('\n');
         }
-        const text = textParts.join(' ').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
+        if (run.length > 3) textParts.push(run);
+        const text = textParts.join(' ');
         const insp = parsePDFText(text);
         if (insp.date) {
           results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
