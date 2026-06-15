@@ -987,6 +987,9 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
         } else {
           results.failed.push({ file: file.name, reason: "Could not extract date" });
         }
+      } catch(err) {
+        results.failed.push({ file: file.name, reason: err.message });
+      }
     }
     if (results.success.length > 0) {
       await onImport(results.success.map(r => r.insp));
