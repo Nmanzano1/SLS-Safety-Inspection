@@ -979,6 +979,13 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
             }
           }
         }
+        // Store original PDF as base64
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        insp.originalPDF = `data:application/pdf;base64,${base64}`;
+
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        insp.originalPDF = `data:application/pdf;base64,${base64}`;
+
         if (insp.date) {
           results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
         } else {
@@ -1297,7 +1304,16 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
                         </td>
                         <td style={{ padding: "10px 12px" }}>
                           <button
-                            onClick={() => generateInspectionPDF(ins, deficiencies)}
+                            onClick={() => {
+  if (ins.originalPDF) {
+    const a = document.createElement("a");
+    a.href = ins.originalPDF;
+    a.download = `SLS_Inspection_${ins.date}.pdf`;
+    a.click();
+  } else {
+    generateInspectionPDF(ins, deficiencies);
+  }
+}}
                             style={{ background: "#1a1500", border: "1px solid #D4AF37", borderRadius: 5, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#D4AF37", whiteSpace: "nowrap" }}
                           >
                             ⬇ PDF
