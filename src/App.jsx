@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from "firebase/firestore";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -43,6 +43,38 @@ async function saveData(key, data) {
     return true;
   } catch (e) {
     console.error("Save error:", e);
+    return false;
+  }
+}
+
+async function saveInspection(inspection) {
+  try {
+    const docRef = doc(db, "sls_inspections", inspection.id);
+    await setDoc(docRef, inspection);
+    return true;
+  } catch (e) {
+    console.error("Save inspection error:", e);
+    return false;
+  }
+}
+
+async function loadInspections() {
+  try {
+    const colRef = collection(db, "sls_inspections");
+    const snap = await getDocs(colRef);
+    return snap.docs.map(d => d.data());
+  } catch (e) {
+    console.error("Load inspections error:", e);
+    return [];
+  }
+}
+
+async function deleteInspectionDoc(id) {
+  try {
+    await deleteDoc(doc(db, "sls_inspections", id));
+    return true;
+  } catch (e) {
+    console.error("Delete inspection error:", e);
     return false;
   }
 }
@@ -247,10 +279,10 @@ function genId() {
 export default function App() {
  const [authenticated, setAuthenticated] = useState(() => {
   try { return localStorage.getItem("sls_auth") === "true"; } catch(e) { return false; }
-});
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState(false);
-  const [view, setView] = useState("dashboard");
+loadInspections(),
+          loadData(STORAGE_KEYS.DEFICIENCIES),
+        ]);
+        setInspections(insp.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)));
   const [inspections, setInspections] = useState([]);
   const [deficiencies, setDeficiencies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -312,7 +344,7 @@ export default function App() {
           newDefs.push({
             id: genId(),
             inspectionId: newInspection.id,
-            date: formData.date,
+            const ok1 = await saveInspection(newInspection);
             inspector: formData.inspector,
             segment: formData.projectArea || "",
             subcontractors: formData.subcontractors || [],
@@ -343,7 +375,7 @@ export default function App() {
     newDefs.forEach((d) => { if (priorItemKeys.has(d.itemKey)) d.isRepeat = true; });
     const updatedDefs = [...newDefs, ...deficiencies];
 
-    setSaveStatus("saving");
+    await deleteInspectionDoc(id);
     const ok1 = await saveData(STORAGE_KEYS.INSPECTIONS, updatedInspections);
     const ok2 = await saveData(STORAGE_KEYS.DEFICIENCIES, updatedDefs);
 
