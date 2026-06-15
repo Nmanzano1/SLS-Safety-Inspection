@@ -841,8 +841,8 @@ async function generateInspectionPDF(inspection, deficiencies) {
   doc.line(pageW - margin - 50, sigY + 26, pageW - margin, sigY + 26);
   doc.setTextColor(120, 120, 120);
   doc.setFontSize(7);
-  doc.text("Signature / SSHO", margin, sigY + 30);
-  doc.text("Date", pageW - margin - 50, sigY + 30);
+  doc.text(inspection.inspector || "SSHO", margin, sigY + 30);
+doc.text(inspection.date || "", pageW - margin - 50, sigY + 30);
 
   // Footer
   doc.setTextColor(...gold);
