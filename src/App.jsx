@@ -980,7 +980,13 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
           }
         }
         // Store original PDF as base64
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const uint8Array = new Uint8Array(arrayBuffer);
+let base64 = '';
+const chunkSize = 8192;
+for (let i = 0; i < uint8Array.length; i += chunkSize) {
+  base64 += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize));
+}
+base64 = btoa(base64);
         insp.originalPDF = `data:application/pdf;base64,${base64}`;
         if (insp.date) {
           results.success.push({ file: file.name, date: insp.date, inspector: insp.inspector, insp });
