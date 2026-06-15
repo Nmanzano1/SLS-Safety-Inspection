@@ -840,8 +840,7 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
 
   const KNOWN_SUBS = ["Ultimate Concrete, LLC", "S&K Design Build", "Strong Steel", "P&C Utility Locators", "H&S Construction", "Fuqua Construction"];
 
-  const parsePDFText = (text) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+ const parsePDFText = (text) => {
     const insp = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       submittedAt: new Date().toISOString(),
@@ -853,73 +852,81 @@ function Dashboard({ inspections, deficiencies, onDelete, onImport }) {
       utilityStrike: false, utilityStrikeType: "Known Utility",
       utilityStrikeDetails: "", itemStatus: {}, itemRemarks: {},
     };
-    for (const line of lines) {
-      const m1 = line.match(/Date\s+(\d{4}-\d{2}-\d{2})/);
-      if (m1) { insp.date = m1[1]; insp.submittedAt = m1[1] + "T12:00:00.000Z"; }
-      const m2 = line.match(/Inspector\s+(.+)/);
-      if (m2) insp.inspector = m2[1].trim();
-      if (line.includes("Periodic Safety Inspection")) insp.inspectionType = "Periodic Safety Inspection";
-      const m3 = line.match(/Project Area\s+(\S+)/);
-      if (m3) insp.projectArea = m3[1];
-      const m4 = line.match(/Weather\s+(.+)/);
-      if (m4) insp.weather = m4[1].trim();
-      const m5 = line.match(/Temp High \/ Low\s+(\d+)F\s*\/\s*(\d+)F/);
-      if (m5) { insp.tempHigh = m5[1]; insp.tempLow = m5[2]; }
-      const m6 = line.match(/Humidity\s+(\d+)%/);
-      if (m6) insp.humidity = m6[1];
-      if (line.match(/AHA Sign-In Verified/) && line.includes("YES")) insp.ahaSignedIn = true;
-      const m7 = line.match(/Toolbox Talk\s+(.+)/);
-      if (m7 && m7[1].trim().toLowerCase() !== "none") insp.toolboxTopic = m7[1].trim();
-      if (line.match(/Subcontractors\s+/)) {
-        const m8 = line.match(/Subcontractors\s+(.+?)(?:Temp High|$)/);
-        if (m8) {
-          let rem = m8[1].trim();
-          const subs = [];
-          for (const ks of KNOWN_SUBS) {
-            if (rem.includes(ks)) { subs.push(ks); rem = rem.replace(ks, "").replace(/^[\s,]+/, ""); }
+
+    // Inspection type
+    if (text.includes("Periodic Safety Inspection")) insp.inspectionType = "Periodic Safety Inspection";
+
+    // Header fields
+    const dateM = text.match(/Date\s+([\d]{4}-[\d]{2}-[\d]{2})/);
+    if (dateM) { insp.date = dateM[1]; insp.submittedAt = dateM[1] + "T12:00:00.000Z"; }
+
+    const inspM = text.match(/Inspector\s+([\w\s]+\(Safety Department\))/);
+    if (inspM) insp.inspector = inspM[1].trim();
+
+    const areaM = text.match(/Project Area\s+(\S+)/);
+    if (areaM) insp.projectArea = areaM[1].trim();
+
+    const weatherM = text.match(/Weather\s+(Clear \/ Sunny|Partly Cloudy|Overcast \/ Cloudy|Rain \/ Thunderstorm|High Winds \/ Dust)/);
+    if (weatherM) insp.weather = weatherM[1].trim();
+
+    const tempM = text.match(/Temp High \/ Low\s+(\d+)F\s*\/\s*(\d+)F/);
+    if (tempM) { insp.tempHigh = tempM[1]; insp.tempLow = tempM[2]; }
+
+    const humM = text.match(/Humidity\s+(\d+)%/);
+    if (humM) insp.humidity = humM[1];
+
+    if (text.match(/AHA Sign-In Verified\s+YES/)) insp.ahaSignedIn = true;
+
+    const tbtM = text.match(/Toolbox Talk\s+(.+?)(?=\n|HEAT INDEX|$)/);
+    if (tbtM && tbtM[1].trim().toLowerCase() !== "none") insp.toolboxTopic = tbtM[1].trim();
+
+    const goM = text.match(/General Observations\s+(.+?)(?=CERTIFICATION|Signature|$)/is);
+    if (goM) insp.generalObservations = goM[1].trim().slice(0, 500);
+
+    // Subcontractors
+    const subM = text.match(/Subcontractors\s+(.+?)\s+Temp High/is);
+    if (subM) {
+      const raw = subM[1].trim();
+      const known = ["Ultimate Concrete, LLC", "S&K Design Build", "Strong Steel", "P&C Utility Locators", "H&S Construction", "Fuqua Construction"];
+      const found = [];
+      let rem = raw;
+      for (const k of known) {
+        if (rem.includes(k)) { found.push(k); rem = rem.replace(k, ""); }
+      }
+      insp.subcontractors = found.length ? found : raw.split(/,\s*/).filter(Boolean);
+    }
+
+    // Item statuses
+    for (const sec of INSPECTION_SECTIONS) {
+      for (let i = 0; i < sec.items.length; i++) {
+        const key = `${sec.id}_${i}`;
+        const anchor = sec.items[i].slice(0, 45).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(anchor + '[\\s\\S]{0,300}?(PASS|DEFICIENCY|N\\/A)', 'i');
+        const m = text.match(re);
+        if (m) {
+          insp.itemStatus[key] = m[1] === "PASS" ? "✓ Satisfactory" : m[1] === "DEFICIENCY" ? "✗ Deficiency" : "N/A";
+        }
+      }
+    }
+
+    // Deficiency remarks
+    const defBlocks = [...text.matchAll(/DEFICIENCY\s+([\s\S]+?)(?=\nPASS|\nDEFICIENCY|\nN\/A|\nInspection Item|\nDEFICIENCIES|CERTIFICATION)/gi)];
+    let defCount = 0;
+    for (const block of defBlocks) {
+      const remark = block[1].trim().slice(0, 400);
+      for (const sec of INSPECTION_SECTIONS) {
+        for (let i = 0; i < sec.items.length; i++) {
+          const key = `${sec.id}_${i}`;
+          if (insp.itemStatus[key] === "✗ Deficiency" && !insp.itemRemarks[key]) {
+            insp.itemRemarks[key] = remark;
+            defCount++;
+            break;
           }
-          for (const s of rem.split(",")) { const t = s.trim(); if (t && !subs.includes(t)) subs.push(t); }
-          insp.subcontractors = subs.filter(Boolean);
         }
+        if (defCount > 0) { defCount = 0; break; }
       }
     }
-    let currentSection = null;
-    const SECTIONS = INSPECTION_SECTIONS;
-    for (const line of lines) {
-      for (const sec of SECTIONS) {
-        if (line.toLowerCase().includes(sec.label.toLowerCase()) && line.length < sec.label.length + 15) {
-          currentSection = sec; break;
-        }
-      }
-      if (!currentSection) continue;
-      if (line.startsWith("DEFICIENCIES") || line.startsWith("CERTIFICATION")) { currentSection = null; continue; }
-      let status = null, remark = "", itemText = line;
-      for (const s of ["DEFICIENCY", "PASS", "N/A"]) {
-        if (line.includes(s)) {
-          const idx = line.indexOf(s);
-          itemText = line.slice(0, idx).trim();
-          remark = line.slice(idx + s.length).trim();
-          status = s; break;
-        }
-      }
-      if (!status) continue;
-      const normLine = itemText.toLowerCase().replace(/[^\w\s]/g, ' ');
-      let bestIdx = -1, bestScore = 0;
-      for (let i = 0; i < currentSection.items.length; i++) {
-        const normItem = currentSection.items[i].toLowerCase().replace(/[^\w\s]/g, ' ');
-        const lineWords = new Set(normLine.split(/\s+/).filter(w => w.length > 3));
-        const itemWords = new Set(normItem.split(/\s+/).filter(w => w.length > 3));
-        let overlap = 0;
-        for (const w of lineWords) { if (itemWords.has(w)) overlap++; }
-        const score = itemWords.size > 0 ? overlap / itemWords.size : 0;
-        if (score > bestScore && score > 0.3) { bestScore = score; bestIdx = i; }
-      }
-      if (bestIdx >= 0) {
-        const key = `${currentSection.id}_${bestIdx}`;
-        insp.itemStatus[key] = status === "PASS" ? "✓ Satisfactory" : status === "DEFICIENCY" ? "✗ Deficiency" : "N/A";
-        if (remark) insp.itemRemarks[key] = remark;
-      }
-    }
+
     return insp;
   };
 
