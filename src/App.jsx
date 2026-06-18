@@ -1300,7 +1300,7 @@ base64 = btoa(base64);
                   </tr>
                 </thead>
                 <tbody>
-                  {inspections.slice(0, 10).map((ins) => {
+                  {[...inspections].sort((a, b) => new Date(b.date) - new Date(a.date)).map((ins) => {
                     const defCount = Object.values(ins.itemStatus || {}).filter((v) => v === "✗ Deficiency").length;
                     return (
                       <tr key={ins.id} style={{ borderBottom: "1px solid #1a2a3a" }}>
