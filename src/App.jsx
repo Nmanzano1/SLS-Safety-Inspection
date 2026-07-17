@@ -520,7 +520,7 @@ if (!authenticated) {
   setTimeout(() => setSaveStatus(""), 3000);
 }} />}
         {view === "form" && <InspectionForm onSubmit={submitInspection} />}
-        {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} onUpdate={updateDeficiency} onDelete={deleteDeficiencies} />}
+        {view === "deficiencies" && <DeficiencyLog deficiencies={deficiencies} inspections={inspections} onUpdate={updateDeficiency} onDelete={deleteDeficiencies} />}
         {view === "metrics" && <SafetyMetrics inspections={inspections} />}
         {view === "reports" && <Reports inspections={inspections} deficiencies={deficiencies} />}
       </div>
@@ -1871,7 +1871,7 @@ const calcHeatIndex = (t, rh) => {
 }
 
 // ─── DEFICIENCY LOG ────────────────────────────────────────────────────────────
-function DeficiencyLog({ deficiencies, onUpdate, onDelete }) {
+function DeficiencyLog({ deficiencies, inspections, onUpdate, onDelete }) {
   const [filter, setFilter] = useState("All");
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -1963,7 +1963,7 @@ function DeficiencyLog({ deficiencies, onUpdate, onDelete }) {
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
                       <span style={{ background: "#1a2a3a", borderRadius: 4, padding: "2px 10px", fontSize: 11, color: "#D4AF37", fontWeight: 700 }}>{def.section}</span>
                       {def.segment && <span style={{ background: "#0a1a2a", borderRadius: 4, padding: "2px 10px", fontSize: 11, color: "#64b5f6", fontWeight: 700 }}>📍 {def.segment}</span>}
-                      <span style={{ fontSize: 12, color: "#666" }}>{def.date}</span>
+                      <span style={{ fontSize: 11, color: "#666" }}>{def.date || inspections.find(i => i.id === def.inspectionId)?.date || "--"}</span>
                       <span style={{ fontSize: 12, color: "#888" }}>by {def.inspector}</span>
                       {def.isRepeat && <span style={{ background: "#3a0a0a", color: "#f44336", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>🔁 REPEAT</span>}
                       {isOverdue && <span style={{ background: "#3a1a1a", color: "#f44336", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>OVERDUE</span>}
