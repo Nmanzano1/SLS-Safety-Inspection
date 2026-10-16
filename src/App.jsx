@@ -2800,6 +2800,7 @@ function SafetyMetrics({ inspections = [] }) {
             </button>
           </div>
           <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20 }}>
+            <button onClick={() => window.print()} style={{ background: "#0a1018", border: "1px solid #D4AF37", borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#D4AF37", marginBottom: 12 }}>🖨 Print Incident Log</button>
             <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 14 }}>Incident Log</div>
             {[...incidents].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(inc=>(
               <div key={inc.id} style={{ background: "#0a1018", border: `1px solid ${inc.type==="LTI"?"#f44336":inc.type==="Near Miss"?"#ff9800":"#1e3a5f"}`, borderRadius: 6, padding: 14, marginBottom: 10 }}>
