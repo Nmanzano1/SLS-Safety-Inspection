@@ -1921,7 +1921,7 @@ function DeficiencyLog({ deficiencies, inspections, onUpdate, onDelete }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#D4AF37", marginBottom: 4 }}>Deficiency Log</h1>
           <p style={{ color: "#666", fontSize: 13 }}>{deficiencies.length} total · {deficiencies.filter((d) => d.status === "Open").length} open</p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={() => window.print()} style={{ background: "#0a1018", border: "1px solid #D4AF37", borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#D4AF37" }}>🖨 Print Log</button><div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {["All", "Open", "Closed"].map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={{
               background: filter === f ? "#1e3a5f" : "#111d2b", border: `1px solid ${filter === f ? "#D4AF37" : "#1e3a5f"}`,
