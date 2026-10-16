@@ -2789,7 +2789,7 @@ function SafetyMetrics({ inspections = [] }) {
               <div><label style={ls}>Date</label><input type="date" style={fs} value={incForm.date} onChange={e => setIncForm(f=>({...f,date:e.target.value}))} /></div>
               <div><label style={ls}>Type</label>
                 <select style={fs} value={incForm.type} onChange={e => setIncForm(f=>({...f,type:e.target.value}))}>
-                  <option>LTI</option><option>Recordable</option><option>Near Miss</option><option>Property Damage</option><option>First Aid</option>
+                  <option>LTI</option><option>Recordable</option><option>Near Miss</option><option>Property Damage</option><option>First Aid</option><option>Incident</option>
                 </select>
               </div>
               <div><label style={ls}>Lost Days (if LTI)</label><input type="number" style={fs} value={incForm.lostDays} onChange={e => setIncForm(f=>({...f,lostDays:e.target.value}))} placeholder="0" /></div>
