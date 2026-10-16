@@ -2783,7 +2783,7 @@ function SafetyMetrics({ inspections = [] }) {
       {/* INCIDENTS */}
       {activeTab === "incidents" && (
         <div>
-          <div style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20, marginBottom: 16 }}>
+          <div className="no-print" style={{ background: "#111d2b", border: "1px solid #1e3a5f", borderRadius: 8, padding: 20, marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "#D4AF37", marginBottom: 14, textTransform: "uppercase", letterSpacing: 1 }}>Log New Incident</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12 }}>
               <div><label style={ls}>Date</label><input type="date" style={fs} value={incForm.date} onChange={e => setIncForm(f=>({...f,date:e.target.value}))} /></div>
