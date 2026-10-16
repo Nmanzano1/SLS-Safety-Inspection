@@ -2254,6 +2254,7 @@ const toolboxTopics = allTalks.map(t => t.topic);
           <p style={{ color: "#666", fontSize: 13 }}>Auto-generated from submitted inspection data</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+         <button onClick={() => window.print()} style={{ background: "#0a1018", border: "1px solid #D4AF37", borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#D4AF37" }}>🖨 Print Report</button>
           <button onClick={exportInspectionsCSV} style={{ background: "#0a1018", border: "1px solid #D4AF37", borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#D4AF37" }}>
             ⬇ Export Inspections CSV
           </button>
