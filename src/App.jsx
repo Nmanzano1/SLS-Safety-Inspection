@@ -81,7 +81,7 @@ async function deleteInspectionDoc(id) {
 }
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────────
-const INSPECTORS = ["Nicholas Manzano (Safety Department)", "Other"];
+const INSPECTORS = ["Nick Manzano, RIHP, CHST (Safety Department)", "Other"];
 const INSPECTION_TYPES = ["Regular Safety Inspection", "Monthly Safety Inspection"];
 const WEATHER_CONDITIONS = ["Clear / Sunny", "Partly Cloudy", "Overcast / Cloudy", "Rain / Thunderstorm", "High Winds / Dust"];
 const SUBCONTRACTORS = [
