@@ -849,7 +849,7 @@ doc.text(inspection.date || "", pageW - margin - 50, sigY + 30);
   doc.setFontSize(6.5);
   doc.text(`SLS Safety  |  ${inspection.inspectionType || "Daily Safety Inspection"}  |  ${inspection.date || ""}  |  OSHA 29 CFR 1926 Compliant`, pageW / 2, sigY + 33, { align: "center" });
 
-  const filename = `SLS_Inspection_${(inspection.date || "").replace(/-/g, "")}_${(inspection.inspector || "").split(" ")[0]}.pdf`;
+  const filename = `${inspection.date || "undated"} SLS Inspection ${(inspection.inspector || "").split(" ")[0]}.pdf`;
   doc.save(filename);
 }
 
